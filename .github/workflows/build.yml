@@ -39,22 +39,29 @@ jobs:
       - name: Prepare & Sync Source Code
         if: ${{ github.event.inputs.step_1_download == 'true' }}
         run: |
+          # 1. Configure mandatory git identity for a fresh machine
+          git config --global user.name "Builder"
+          git config --global user.email "builder@localhost"
           git config --global --add safe.directory '*'
           git config --global http.postBuffer 524288000
           
-          # If this is a future run and .repo exists, clean up the workspace first
-          if [ -d ".repo" ]; then
+          # 2. Check if .repo exists. If not, initialize it. If yes, clean it.
+          if [ ! -d ".repo" ]; then
+            echo "Initializing repository manifest..."
+            repo init -u https://github.com/mer-hybris/android.git -b halium-9.0
+          else
+            echo "Workspace exists. Cleaning up..."
             rm -rf packages/resources/devicesettings || true
             repo forall -c 'git reset --hard HEAD' || true
           fi
           
-          # Run your sync script FIRST (this must contain your 'repo init' command)
+          # 3. Execute custom sync script (Creates local manifest & partial sync)
           bash ci/sync_repo.sh
           
-          # Force a final sync just to ensure all trees are updated
+          # 4. Force a final sync to ensure all trees are updated
           repo sync -f -j$(nproc)
           
-          # Clone external dependencies
+          # 5. Clone external dependencies required for Sailfish OS
           rm -rf vendor/lineage/bootanimation external/one-true-awk external/fsck_msdos external/xz-embedded external/puffin external/libhybris external/cros/system_api
           git clone --depth 1 https://github.com/LineageOS/android_external_one-true-awk.git -b lineage-16.0 external/one-true-awk
           git clone --depth 1 https://github.com/LineageOS/android_external_fsck_msdos.git -b lineage-16.0 external/fsck_msdos
