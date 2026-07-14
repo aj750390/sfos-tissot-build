@@ -1,8 +1,23 @@
 name: Sailfish OS Tissot Build
 
-# This allows you to trigger the build manually from the GitHub Actions tab
 on:
   workflow_dispatch:
+    inputs:
+      step_1_download:
+        description: 'Step 1: Download & Sync Source Code'
+        required: true
+        type: boolean
+        default: true
+      step_2_build:
+        description: 'Step 2: Build Android and Droid HAL'
+        required: true
+        type: boolean
+        default: true
+      step_3_package:
+        description: 'Step 3: Package Flashable Zip'
+        required: true
+        type: boolean
+        default: true
 
 env:
   SFOS_RELEASE: "4.5.0.24"
@@ -12,31 +27,27 @@ env:
 
 jobs:
   compile:
-    # THIS IS THE MAGIC LINE: It tells GitHub to use your VM, not their cloud servers
     runs-on: self-hosted
     
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Prepare Build Environment
+      # ==========================================
+      # STEP 1: DOWNLOAD CODE
+      # ==========================================
+      - name: Prepare & Sync Source Code
+        if: ${{ github.event.inputs.step_1_download == 'true' }}
         run: |
           git config --global --add safe.directory '*'
           git config --global http.postBuffer 524288000
           
-      - name: Execute Sync Phase
-        run: |
-          # Force clean state for repo sync just in case
           rm -rf packages/resources/devicesettings || true
           repo forall -c 'git reset --hard HEAD' || true
           repo sync -f -j$(nproc)
           bash ci/sync_repo.sh
-
-      - name: Prepare External Dependencies
-        run: |
-          rm -rf vendor/lineage/bootanimation
-          rm -rf external/one-true-awk external/fsck_msdos external/xz-embedded external/puffin external/libhybris external/cros/system_api
           
+          rm -rf vendor/lineage/bootanimation external/one-true-awk external/fsck_msdos external/xz-embedded external/puffin external/libhybris external/cros/system_api
           git clone --depth 1 https://github.com/LineageOS/android_external_one-true-awk.git -b lineage-16.0 external/one-true-awk
           git clone --depth 1 https://github.com/LineageOS/android_external_fsck_msdos.git -b lineage-16.0 external/fsck_msdos
           git clone --depth 1 https://android.googlesource.com/platform/external/xz-embedded -b android-9.0.0_r46 external/xz-embedded
@@ -45,7 +56,11 @@ jobs:
           cd external/libhybris && git submodule update --init --depth 1 && cd ../..
           git clone --depth 1 https://android.googlesource.com/platform/external/cros/system_api -b android-9.0.0_r46 external/cros/system_api
 
-      - name: Fix Python Scripts for Halium
+      # ==========================================
+      # STEP 2: BUILD HAL
+      # ==========================================
+      - name: Build Android & Droid HAL
+        if: ${{ github.event.inputs.step_2_build == 'true' }}
         run: |
           echo '#!/usr/bin/env python3' > build/make/tools/check_radio_versions.py && echo 'import sys' >> build/make/tools/check_radio_versions.py && echo 'sys.exit(0)' >> build/make/tools/check_radio_versions.py
           sed -i 's/iteritems()/items()/g' build/make/tools/post_process_props.py
@@ -58,8 +73,6 @@ jobs:
           sed -i 's/lower <= value <= upper/int(lower) <= int(value) <= int(upper)/g' bionic/libc/fs_config_generator.py
           sed -i 's/exit 1/exit 0/g' hybris/hybris-boot/fixup-mountpoints
 
-      - name: Build Android HAL
-        run: |
           export TARGET_NO_RECOVERY=true
           export ALLOW_MISSING_DEPENDENCIES=true
           export SELINUX_IGNORE_NEVERALLOWS=true
@@ -68,23 +81,37 @@ jobs:
           export PORT_ROOT=$GITHUB_WORKSPACE
           bash ci/build.sh
 
-      - name: Clone Droid HAL and Configs
-        run: |
           rm -rf rpm hybris/droid-configs
           mkdir -p hybris droid-local-repo
-          git clone --recurse-submodules https://github.com/YOUR_USERNAME/droid-hal-tissot.git rpm
+          git clone --recurse-submodules https://github.com/aj750390/droid-hal-tissot.git rpm
           cp -r rpm/rpm/* rpm/ 2>/dev/null || true
-          git clone https://github.com/YOUR_USERNAME/droid-config-tissot.git hybris/droid-configs
+          git clone https://github.com/aj750390/droid-config-tissot.git hybris/droid-configs
           cp -r hybris/droid-configs/rpm/* hybris/droid-configs/ 2>/dev/null || true
 
-      - name: Build Sailfish OS Packages
-        run: |
           export PORT_ARCH=$SFOS_ARCH
           chmod +x rpm/dhd/helpers/build_packages.sh
           mb2 build --dhd
           mb2 build --configs
-          
+
+      # ==========================================
+      # STEP 3: PACKAGE ZIP
+      # ==========================================
       - name: Bundle Flashable Zip
+        if: ${{ github.event.inputs.step_3_package == 'true' }}
         run: |
           export KS_FILE=$(find $GITHUB_WORKSPACE -name "*.ks" | head -n 1)
           mic create fs --arch=$SFOS_ARCH --tokenmap=ARCH:$SFOS_ARCH,RELEASE:$SFOS_RELEASE,EXTRA_NAME:tissot --record-pkgs=name,url --outdir=$GITHUB_WORKSPACE/sfe-tissot-out --pack-to=sfe-tissot.tar.bz2 $KS_FILE
+
+      # ==========================================
+      # STEP 4: UPLOAD FOR DOWNLOAD
+      # ==========================================
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        # This step will run as long as Step 3 succeeds, or you can manually ensure it captures files
+        with:
+          name: sfos-tissot-build-files
+          path: |
+            out/target/product/tissot/*.img
+            sfe-tissot-out/*
+            *.tar.bz2
+          retention-days: 90
