@@ -1,0 +1,90 @@
+name: Sailfish OS Tissot Build
+
+# This allows you to trigger the build manually from the GitHub Actions tab
+on:
+  workflow_dispatch:
+
+env:
+  SFOS_RELEASE: "4.5.0.24"
+  SFOS_ARCH: "aarch64"
+  VENDOR: "xiaomi"
+  DEVICE: "tissot"
+
+jobs:
+  compile:
+    # THIS IS THE MAGIC LINE: It tells GitHub to use your VM, not their cloud servers
+    runs-on: self-hosted
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Prepare Build Environment
+        run: |
+          git config --global --add safe.directory '*'
+          git config --global http.postBuffer 524288000
+          
+      - name: Execute Sync Phase
+        run: |
+          # Force clean state for repo sync just in case
+          rm -rf packages/resources/devicesettings || true
+          repo forall -c 'git reset --hard HEAD' || true
+          repo sync -f -j$(nproc)
+          bash ci/sync_repo.sh
+
+      - name: Prepare External Dependencies
+        run: |
+          rm -rf vendor/lineage/bootanimation
+          rm -rf external/one-true-awk external/fsck_msdos external/xz-embedded external/puffin external/libhybris external/cros/system_api
+          
+          git clone --depth 1 https://github.com/LineageOS/android_external_one-true-awk.git -b lineage-16.0 external/one-true-awk
+          git clone --depth 1 https://github.com/LineageOS/android_external_fsck_msdos.git -b lineage-16.0 external/fsck_msdos
+          git clone --depth 1 https://android.googlesource.com/platform/external/xz-embedded -b android-9.0.0_r46 external/xz-embedded
+          git clone --depth 1 https://android.googlesource.com/platform/external/puffin -b android-9.0.0_r46 external/puffin
+          git clone https://github.com/mer-hybris/libhybris.git external/libhybris
+          cd external/libhybris && git submodule update --init --depth 1 && cd ../..
+          git clone --depth 1 https://android.googlesource.com/platform/external/cros/system_api -b android-9.0.0_r46 external/cros/system_api
+
+      - name: Fix Python Scripts for Halium
+        run: |
+          echo '#!/usr/bin/env python3' > build/make/tools/check_radio_versions.py && echo 'import sys' >> build/make/tools/check_radio_versions.py && echo 'sys.exit(0)' >> build/make/tools/check_radio_versions.py
+          sed -i 's/iteritems()/items()/g' build/make/tools/post_process_props.py
+          2to3 -w build/make/tools/normalize_path.py
+          sed -i 's/print sys.stderr/# print sys.stderr/g' external/clang/clang-version-inc.py
+          sed -i 's/print >> sys.stderr/# print >> sys.stderr/g' external/clang/clang-version-inc.py
+          sed -i -E 's/print\s+line/print(line)/g' external/clang/clang-version-inc.py
+          sed -i 's/iteritems()/items()/g' external/clang/clang-version-inc.py
+          2to3 -w bionic/libc/fs_config_generator.py
+          sed -i 's/lower <= value <= upper/int(lower) <= int(value) <= int(upper)/g' bionic/libc/fs_config_generator.py
+          sed -i 's/exit 1/exit 0/g' hybris/hybris-boot/fixup-mountpoints
+
+      - name: Build Android HAL
+        run: |
+          export TARGET_NO_RECOVERY=true
+          export ALLOW_MISSING_DEPENDENCIES=true
+          export SELINUX_IGNORE_NEVERALLOWS=true
+          export HABUILD_DIR=$GITHUB_WORKSPACE
+          export ANDROID_ROOT=$GITHUB_WORKSPACE
+          export PORT_ROOT=$GITHUB_WORKSPACE
+          bash ci/build.sh
+
+      - name: Clone Droid HAL and Configs
+        run: |
+          rm -rf rpm hybris/droid-configs
+          mkdir -p hybris droid-local-repo
+          git clone --recurse-submodules https://github.com/YOUR_USERNAME/droid-hal-tissot.git rpm
+          cp -r rpm/rpm/* rpm/ 2>/dev/null || true
+          git clone https://github.com/YOUR_USERNAME/droid-config-tissot.git hybris/droid-configs
+          cp -r hybris/droid-configs/rpm/* hybris/droid-configs/ 2>/dev/null || true
+
+      - name: Build Sailfish OS Packages
+        run: |
+          export PORT_ARCH=$SFOS_ARCH
+          chmod +x rpm/dhd/helpers/build_packages.sh
+          mb2 build --dhd
+          mb2 build --configs
+          
+      - name: Bundle Flashable Zip
+        run: |
+          export KS_FILE=$(find $GITHUB_WORKSPACE -name "*.ks" | head -n 1)
+          mic create fs --arch=$SFOS_ARCH --tokenmap=ARCH:$SFOS_ARCH,RELEASE:$SFOS_RELEASE,EXTRA_NAME:tissot --record-pkgs=name,url --outdir=$GITHUB_WORKSPACE/sfe-tissot-out --pack-to=sfe-tissot.tar.bz2 $KS_FILE
