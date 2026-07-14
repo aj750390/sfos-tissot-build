@@ -42,11 +42,19 @@ jobs:
           git config --global --add safe.directory '*'
           git config --global http.postBuffer 524288000
           
-          rm -rf packages/resources/devicesettings || true
-          repo forall -c 'git reset --hard HEAD' || true
-          repo sync -f -j$(nproc)
+          # If this is a future run and .repo exists, clean up the workspace first
+          if [ -d ".repo" ]; then
+            rm -rf packages/resources/devicesettings || true
+            repo forall -c 'git reset --hard HEAD' || true
+          fi
+          
+          # Run your sync script FIRST (this must contain your 'repo init' command)
           bash ci/sync_repo.sh
           
+          # Force a final sync just to ensure all trees are updated
+          repo sync -f -j$(nproc)
+          
+          # Clone external dependencies
           rm -rf vendor/lineage/bootanimation external/one-true-awk external/fsck_msdos external/xz-embedded external/puffin external/libhybris external/cros/system_api
           git clone --depth 1 https://github.com/LineageOS/android_external_one-true-awk.git -b lineage-16.0 external/one-true-awk
           git clone --depth 1 https://github.com/LineageOS/android_external_fsck_msdos.git -b lineage-16.0 external/fsck_msdos
@@ -107,7 +115,6 @@ jobs:
       # ==========================================
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
-        # This step will run as long as Step 3 succeeds, or you can manually ensure it captures files
         with:
           name: sfos-tissot-build-files
           path: |
