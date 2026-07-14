@@ -48,7 +48,7 @@ jobs:
           # 2. Check if .repo exists. If not, initialize it. If yes, clean it.
           if [ ! -d ".repo" ]; then
             echo "Initializing repository manifest..."
-            repo init -u https://github.com/mer-hybris/android.git -b halium-9.0
+            repo init -u https://github.com/mer-hybris/android.git -b hybris-16.0
           else
             echo "Workspace exists. Cleaning up..."
             rm -rf packages/resources/devicesettings || true
