@@ -41,13 +41,11 @@ jobs:
       - name: Prepare & Sync Source Code
         if: ${{ github.event.inputs.step_1_download == 'true' }}
         run: |
-          # 1. Configure mandatory git identity for a fresh machine
           git config --global user.name "Builder"
           git config --global user.email "builder@localhost"
           git config --global --add safe.directory '*'
           git config --global http.postBuffer 524288000
           
-          # 2. Check if .repo exists. If not, initialize it. If yes, clean it.
           if [ ! -d ".repo" ]; then
             echo "Initializing repository manifest..."
             repo init -u https://github.com/mer-hybris/android.git -b hybris-16.0
@@ -57,13 +55,9 @@ jobs:
             repo forall -c 'git reset --hard HEAD' || true
           fi
           
-          # 3. Execute custom sync script (Creates local manifest & partial sync)
           bash ci/sync_repo.sh
-          
-          # 4. Force a final sync to ensure all trees are updated
           repo sync -f -j$(nproc)
           
-          # 5. Clone external dependencies required for Sailfish OS
           rm -rf vendor/lineage/bootanimation external/one-true-awk external/fsck_msdos external/xz-embedded external/puffin external/libhybris external/cros/system_api
           git clone --depth 1 https://github.com/LineageOS/android_external_one-true-awk.git -b lineage-16.0 external/one-true-awk
           git clone --depth 1 https://github.com/LineageOS/android_external_fsck_msdos.git -b lineage-16.0 external/fsck_msdos
@@ -97,10 +91,7 @@ jobs:
           export ANDROID_ROOT=$GITHUB_WORKSPACE
           export PORT_ROOT=$GITHUB_WORKSPACE
           
-          # 1. Force reset the stuck files back to their original factory state
           git -C kernel/xiaomi/msm8953 checkout scripts/dtc/dtc-lexer.lex.c_shipped scripts/dtc/dtc-lexer.l || true
-          
-          # 2. Apply the compiler patch cleanly
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.lex.c_shipped || true
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.l || true
 
@@ -109,24 +100,27 @@ jobs:
           rm -rf rpm hybris/droid-configs
           mkdir -p hybris droid-local-repo
           
-          # 3. Bypass GitHub Actions strict authentication for public secondary repositories
           git config --global --unset-all http.https://github.com/.extraheader || true
           git config --local --unset-all http.https://github.com/.extraheader || true
 
-          # Download GitLab repositories instead of GitHub
-          git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm
+          echo "Testing connection to GitLab..."
+          for i in {1..3}; do
+            ping -c 3 gitlab.com && break
+            echo "DNS lookup failed, retrying in 5 seconds..."
+            sleep 5
+          done
+
+          git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm || git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           cp -r rpm/rpm/* rpm/ 2>/dev/null || true
-          git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
+          git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs || git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
           cp -r hybris/droid-configs/rpm/* hybris/droid-configs/ 2>/dev/null || true
 
           export PORT_ARCH=$SFOS_ARCH
           chmod +x rpm/dhd/helpers/build_packages.sh
           
-          # 4. Fix permissions so the Docker container can write its output files back to your host VM
           chmod 777 $GITHUB_WORKSPACE
           chmod -R 777 rpm hybris droid-local-repo
           
-          # 5. Use the community Sailfish SDK Docker container to run the official packaging scripts
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -e PORT_ARCH=$SFOS_ARCH -e DEVICE=$DEVICE -e VENDOR=$VENDOR -e HABUILD_DEVICE=$DEVICE coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "cd /share && ./rpm/dhd/helpers/build_packages.sh -b dhd && ./rpm/dhd/helpers/build_packages.sh -b configs"
 
       # ==========================================
