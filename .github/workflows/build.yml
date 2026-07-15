@@ -121,8 +121,9 @@ jobs:
 
           export PORT_ARCH=$SFOS_ARCH
           chmod +x rpm/dhd/helpers/build_packages.sh
-          mb2 build --dhd
-          mb2 build --configs
+          
+          # 4. Use the community Sailfish SDK Docker container to run mb2 packaging tools securely
+          docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -e PORT_ARCH=$SFOS_ARCH coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "cd /share && mb2 -t SailfishOS-$SFOS_RELEASE-$SFOS_ARCH build --dhd && mb2 -t SailfishOS-$SFOS_RELEASE-$SFOS_ARCH build --configs"
 
       # ==========================================
       # STEP 3: PACKAGE ZIP
