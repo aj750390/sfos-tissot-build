@@ -100,13 +100,12 @@ jobs:
           # 1. Force reset the stuck files back to their original factory state
           git -C kernel/xiaomi/msm8953 checkout scripts/dtc/dtc-lexer.lex.c_shipped scripts/dtc/dtc-lexer.l || true
           
-          # 2. Apply the patch cleanly exactly once
+          # 2. Apply the compiler patch cleanly
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.lex.c_shipped || true
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.l || true
 
-          # 3. Delete corrupted logs and corrupted kernel objects from previous interrupted runs
-          rm -f out/.ninja_log out/.ninja_deps || true
-          rm -rf out/target/product/tissot/obj/KERNEL_OBJ || true
+          # 3. Nuclear clean: Completely wipe the build output to clear ALL corrupted files from the crash
+          rm -rf out/ || true
 
           bash ci/build.sh
 
