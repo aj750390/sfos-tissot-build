@@ -96,6 +96,11 @@ jobs:
           export HABUILD_DIR=$GITHUB_WORKSPACE
           export ANDROID_ROOT=$GITHUB_WORKSPACE
           export PORT_ROOT=$GITHUB_WORKSPACE
+          
+          # Fix compiler strictness error in older Android kernels
+          sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.lex.c_shipped || true
+          sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.l || true
+
           bash ci/build.sh
 
           rm -rf rpm hybris/droid-configs
