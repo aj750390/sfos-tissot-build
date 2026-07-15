@@ -126,8 +126,8 @@ jobs:
           chmod 777 $GITHUB_WORKSPACE
           chmod -R 777 rpm hybris droid-local-repo
           
-          # 5. Use the community Sailfish SDK Docker container to run mb2 packaging tools securely
-          docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -e PORT_ARCH=$SFOS_ARCH coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "cd /share && mb2 -t SailfishOS-$SFOS_RELEASE-$SFOS_ARCH build --dhd && mb2 -t SailfishOS-$SFOS_RELEASE-$SFOS_ARCH build --configs"
+          # 5. Use the community Sailfish SDK Docker container to run the official packaging scripts
+          docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -e PORT_ARCH=$SFOS_ARCH -e DEVICE=$DEVICE -e VENDOR=$VENDOR -e HABUILD_DEVICE=$DEVICE coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "cd /share && ./rpm/dhd/helpers/build_packages.sh --dhd && ./rpm/dhd/helpers/build_packages.sh --configs"
 
       # ==========================================
       # STEP 3: PACKAGE ZIP
