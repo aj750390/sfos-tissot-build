@@ -121,8 +121,8 @@ jobs:
           chmod 777 $GITHUB_WORKSPACE
           chmod -R 777 rpm hybris droid-local-repo
           
-          # Run packaging inside Docker with forced working directory
-          docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -w /share -e PORT_ARCH=$SFOS_ARCH -e DEVICE=$DEVICE -e VENDOR=$VENDOR -e HABUILD_DEVICE=$DEVICE coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "./rpm/dhd/helpers/build_packages.sh -b dhd && ./rpm/dhd/helpers/build_packages.sh -b configs"
+          # Run packaging inside Docker with shortcuts to bypass root-access issues
+          docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -e PORT_ARCH=$SFOS_ARCH -e DEVICE=$DEVICE -e VENDOR=$VENDOR -e HABUILD_DEVICE=$DEVICE coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "ln -s /share/rpm /rpm && ln -s /share/hybris /hybris && ln -s /share/droid-local-repo /droid-local-repo && cd /share && ./rpm/dhd/helpers/build_packages.sh -b dhd && ./rpm/dhd/helpers/build_packages.sh -b configs"
 
       # ==========================================
       # STEP 3: PACKAGE ZIP
