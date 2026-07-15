@@ -28,7 +28,7 @@ env:
 jobs:
   compile:
     runs-on: self-hosted
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
           git config --global user.email "builder@localhost"
           git config --global --add safe.directory '*'
           git config --global http.postBuffer 524288000
-          
+
           if [ ! -d ".repo" ]; then
             echo "Initializing repository manifest..."
             repo init -u https://github.com/mer-hybris/android.git -b hybris-16.0
@@ -54,10 +54,10 @@ jobs:
             rm -rf packages/resources/devicesettings || true
             repo forall -c 'git reset --hard HEAD' || true
           fi
-          
+
           bash ci/sync_repo.sh
           repo sync -f -j$(nproc)
-          
+
           rm -rf vendor/lineage/bootanimation external/one-true-awk external/fsck_msdos external/xz-embedded external/puffin external/libhybris external/cros/system_api
           git clone --depth 1 https://github.com/LineageOS/android_external_one-true-awk.git -b lineage-16.0 external/one-true-awk
           git clone --depth 1 https://github.com/LineageOS/android_external_fsck_msdos.git -b lineage-16.0 external/fsck_msdos
@@ -90,7 +90,7 @@ jobs:
           export HABUILD_DIR=$GITHUB_WORKSPACE
           export ANDROID_ROOT=$GITHUB_WORKSPACE
           export PORT_ROOT=$GITHUB_WORKSPACE
-          
+
           git -C kernel/xiaomi/msm8953 checkout scripts/dtc/dtc-lexer.lex.c_shipped scripts/dtc/dtc-lexer.l || true
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.lex.c_shipped || true
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.l || true
@@ -99,7 +99,7 @@ jobs:
 
           rm -rf rpm hybris/droid-configs
           mkdir -p hybris droid-local-repo
-          
+
           git config --global --unset-all http.https://github.com/.extraheader || true
           git config --local --unset-all http.https://github.com/.extraheader || true
 
@@ -117,12 +117,24 @@ jobs:
 
           export PORT_ARCH=$SFOS_ARCH
           chmod +x rpm/dhd/helpers/build_packages.sh
-          
+
           chmod 777 $GITHUB_WORKSPACE
           chmod -R 777 rpm hybris droid-local-repo
-          
-          # Final attempt: direct workspace working, explicit directory exports to prevent path errors
-          docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -w /share -e PORT_ARCH=$SFOS_ARCH -e DEVICE=$DEVICE -e VENDOR=$VENDOR -e HABUILD_DEVICE=$DEVICE coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "export RPM_DIR=/share/rpm && export CONFIGS_DIR=/share/hybris/droid-configs && ./rpm/dhd/helpers/build_packages.sh -b dhd && ./rpm/dhd/helpers/build_packages.sh -b configs"
+
+          # FIX: ANDROID_ROOT / HABUILD_DIR / PORT_ROOT were exported on the host only.
+          # They never reached the container, so build_packages.sh/util.sh resolved
+          # "$ANDROID_ROOT/hybris" as "/hybris" (empty var), causing:
+          #   mkdir: cannot create directory '/hybris': Permission denied
+          # Fix: explicitly pass them into the container, pointed at the mount path.
+          docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -w /share \
+            -e PORT_ARCH=$SFOS_ARCH \
+            -e DEVICE=$DEVICE \
+            -e VENDOR=$VENDOR \
+            -e HABUILD_DEVICE=$DEVICE \
+            -e ANDROID_ROOT=/share \
+            -e HABUILD_DIR=/share \
+            -e PORT_ROOT=/share \
+            coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "export RPM_DIR=/share/rpm && export CONFIGS_DIR=/share/hybris/droid-configs && ./rpm/dhd/helpers/build_packages.sh -b dhd && ./rpm/dhd/helpers/build_packages.sh -b configs"
 
       # ==========================================
       # STEP 3: PACKAGE ZIP
