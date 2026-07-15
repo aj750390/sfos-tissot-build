@@ -20,7 +20,7 @@ on:
         default: true
 
 env:
-  SFOS_RELEASE: "4.5.0.24"
+  SFOS_RELEASE: "4.5.0.16"
   SFOS_ARCH: "aarch64"
   VENDOR: "xiaomi"
   DEVICE: "tissot"
