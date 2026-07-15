@@ -104,9 +104,6 @@ jobs:
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.lex.c_shipped || true
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.l || true
 
-          # 3. Nuclear clean: Completely wipe the build output to clear ALL corrupted files from the crash
-          rm -rf out/ || true
-
           bash ci/build.sh
 
           rm -rf rpm hybris/droid-configs
