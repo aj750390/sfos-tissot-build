@@ -104,8 +104,9 @@ jobs:
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.lex.c_shipped || true
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.l || true
 
-          # 3. Delete corrupted Ninja logs from previous interrupted runs
+          # 3. Delete corrupted logs and corrupted kernel objects from previous interrupted runs
           rm -f out/.ninja_log out/.ninja_deps || true
+          rm -rf out/target/product/tissot/obj/KERNEL_OBJ || true
 
           bash ci/build.sh
 
