@@ -97,9 +97,9 @@ jobs:
           export ANDROID_ROOT=$GITHUB_WORKSPACE
           export PORT_ROOT=$GITHUB_WORKSPACE
           
-          # Fix compiler strictness error in older Android kernels
-          sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.lex.c_shipped || true
-          sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.l || true
+          # Safely patch compiler strictness error without creating duplicates on re-runs
+          sed -i 's/.*YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.lex.c_shipped || true
+          sed -i 's/.*YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.l || true
 
           bash ci/build.sh
 
