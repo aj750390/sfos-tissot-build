@@ -122,7 +122,11 @@ jobs:
           export PORT_ARCH=$SFOS_ARCH
           chmod +x rpm/dhd/helpers/build_packages.sh
           
-          # 4. Use the community Sailfish SDK Docker container to run mb2 packaging tools securely
+          # 4. Fix permissions so the Docker container can write its output files back to your host VM
+          chmod 777 $GITHUB_WORKSPACE
+          chmod -R 777 rpm hybris droid-local-repo
+          
+          # 5. Use the community Sailfish SDK Docker container to run mb2 packaging tools securely
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -e PORT_ARCH=$SFOS_ARCH coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "cd /share && mb2 -t SailfishOS-$SFOS_RELEASE-$SFOS_ARCH build --dhd && mb2 -t SailfishOS-$SFOS_RELEASE-$SFOS_ARCH build --configs"
 
       # ==========================================
