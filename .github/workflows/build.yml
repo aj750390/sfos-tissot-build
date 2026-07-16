@@ -122,13 +122,16 @@ jobs:
 
           export PORT_ARCH=$SFOS_ARCH
           
+          # sb2 chroot strictly breaks on symlinks. Create a real physical directory instead!
+          sudo rm -rf dhd
+          cp -r rpm dhd
+          
+          sudo chmod +x dhd/dhd/helpers/build_packages.sh
           sudo chmod +x rpm/dhd/helpers/build_packages.sh
           sudo chmod 777 $GITHUB_WORKSPACE
-          sudo chmod -R 777 rpm hybris droid-local-repo
-
-          # FIX: sb2 chroot strictly breaks on symlinks. Create a real physical directory instead!
-          rm -rf dhd
-          cp -r rpm dhd
+          
+          # FIX: Added 'dhd' to the 777 permission list so Docker can create the .mb2 output folder inside it
+          sudo chmod -R 777 rpm dhd hybris droid-local-repo
 
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -w /share \
             -e PORT_ARCH=$SFOS_ARCH \
