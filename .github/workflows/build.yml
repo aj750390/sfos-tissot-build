@@ -56,14 +56,7 @@ jobs:
           fi
 
           bash ci/sync_repo.sh
-          
-          # Handle transient DNS drops during the massive source code sync
-          echo "Starting repo sync with retry logic..."
-          for i in {1..5}; do
-            repo sync -f --force-sync -j$(nproc) && break
-            echo "Sync failed (likely DNS timeout). Retrying in 15 seconds (Attempt $i of 5)..."
-            sleep 15
-          done
+          repo sync -f -j$(nproc)
 
           rm -rf vendor/lineage/bootanimation external/one-true-awk external/fsck_msdos external/xz-embedded external/puffin external/libhybris external/cros/system_api
           git clone --depth 1 https://github.com/LineageOS/android_external_one-true-awk.git -b lineage-16.0 external/one-true-awk
@@ -104,7 +97,8 @@ jobs:
 
           bash ci/build.sh
 
-          rm -rf rpm hybris/droid-configs
+          # FIX: Use sudo to bypass root ownership blocks from previous Docker container runs
+          sudo rm -rf rpm hybris/droid-configs
           mkdir -p hybris droid-local-repo
 
           git config --global --unset-all http.https://github.com/.extraheader || true
