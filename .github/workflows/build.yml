@@ -120,12 +120,11 @@ jobs:
 
           chmod 777 $GITHUB_WORKSPACE
           chmod -R 777 rpm hybris droid-local-repo
+          
+          # Create a shortcut so the script finds the 'dhd' folder it is hardcoded to look for
+          ln -snf rpm dhd
 
-          # FIX: ANDROID_ROOT / HABUILD_DIR / PORT_ROOT were exported on the host only.
-          # They never reached the container, so build_packages.sh/util.sh resolved
-          # "$ANDROID_ROOT/hybris" as "/hybris" (empty var), causing:
-          #   mkdir: cannot create directory '/hybris': Permission denied
-          # Fix: explicitly pass them into the container, pointed at the mount path.
+          # FIX: explicitly pass paths into the container, pointed at the mount path.
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -w /share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
@@ -134,7 +133,7 @@ jobs:
             -e ANDROID_ROOT=/share \
             -e HABUILD_DIR=/share \
             -e PORT_ROOT=/share \
-            coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "export RPM_DIR=/share/rpm && export CONFIGS_DIR=/share/hybris/droid-configs && ./rpm/dhd/helpers/build_packages.sh -b dhd && ./rpm/dhd/helpers/build_packages.sh -b configs"
+            coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "export DHD_DIR=/share/rpm && export RPM_DIR=/share/rpm && export CONFIGS_DIR=/share/hybris/droid-configs && ./rpm/dhd/helpers/build_packages.sh -b dhd && ./rpm/dhd/helpers/build_packages.sh -b configs"
 
       # ==========================================
       # STEP 3: PACKAGE ZIP
