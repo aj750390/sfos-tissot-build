@@ -110,9 +110,14 @@ jobs:
             sleep 5
           done
 
-          # Clone Repositories (Removed the destructive flattening cp commands)
+          # Clone Repositories
           git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm || git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm
+          
+          # Flatten the repository to bring the spec file to the root of rpm/
+          cp -r rpm/rpm/* rpm/ 2>/dev/null || true
+          
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs || git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
+          cp -r hybris/droid-configs/rpm/* hybris/droid-configs/ 2>/dev/null || true
 
           # FIX: Safely duplicate dhd into the rpm subdirectory so the spec file includes work perfectly
           mkdir -p rpm/rpm
@@ -124,7 +129,9 @@ jobs:
           sudo chmod 777 $GITHUB_WORKSPACE
           sudo chmod -R 777 rpm hybris droid-local-repo
 
-          # FIX: Restored DHD_DIR export so the script knows exactly where your repo is located
+          # FIX: Restore the dhd symlink so mb2 can find the build directory
+          ln -snf rpm dhd
+
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -w /share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
