@@ -97,7 +97,6 @@ jobs:
 
           bash ci/build.sh
 
-          # FIX: Use sudo to bypass root ownership blocks from previous Docker container runs
           sudo rm -rf rpm hybris/droid-configs
           mkdir -p hybris droid-local-repo
 
@@ -117,10 +116,11 @@ jobs:
           cp -r hybris/droid-configs/rpm/* hybris/droid-configs/ 2>/dev/null || true
 
           export PORT_ARCH=$SFOS_ARCH
-          chmod +x rpm/dhd/helpers/build_packages.sh
-
-          chmod 777 $GITHUB_WORKSPACE
-          chmod -R 777 rpm hybris droid-local-repo
+          
+          # FIX: Added sudo to bypass the "Operation not permitted" blocks
+          sudo chmod +x rpm/dhd/helpers/build_packages.sh
+          sudo chmod 777 $GITHUB_WORKSPACE
+          sudo chmod -R 777 rpm hybris droid-local-repo
 
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -w /share \
             -e PORT_ARCH=$SFOS_ARCH \
