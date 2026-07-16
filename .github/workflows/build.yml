@@ -97,8 +97,12 @@ jobs:
 
           bash ci/build.sh
 
-          sudo rm -rf rpm hybris droid-local-repo dhd
-          mkdir -p hybris droid-local-repo
+          # SMART CLEANUP: Take back ownership of the workspace from Docker, rather than deleting the source code
+          sudo chown -R $USER:$USER $GITHUB_WORKSPACE
+          
+          # Safely remove only the cloned repositories so we can download fresh ones
+          rm -rf rpm dhd droid-local-repo hybris/droid-configs
+          mkdir -p droid-local-repo
 
           git config --global --unset-all http.https://github.com/.extraheader || true
           git config --local --unset-all http.https://github.com/.extraheader || true
@@ -116,14 +120,13 @@ jobs:
           cp -r hybris/droid-configs/rpm/* hybris/droid-configs/ 2>/dev/null || true
 
           export PORT_ARCH=$SFOS_ARCH
-          sudo chmod +x rpm/dhd/helpers/build_packages.sh
+          chmod +x rpm/dhd/helpers/build_packages.sh
 
-          sudo chmod 777 $GITHUB_WORKSPACE
-          sudo chmod -R 777 rpm hybris droid-local-repo
+          chmod 777 $GITHUB_WORKSPACE
+          chmod -R 777 rpm hybris droid-local-repo
           
           ln -snf rpm dhd
 
-          # FIX: Explicitly pass TARGET and RELEASE to force the script to use the container's pre-built target
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -w /share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
