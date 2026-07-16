@@ -97,7 +97,7 @@ jobs:
 
           bash ci/build.sh
 
-          sudo rm -rf rpm hybris/droid-configs
+          sudo rm -rf rpm hybris/droid-configs dhd
           mkdir -p hybris droid-local-repo
 
           git config --global --unset-all http.https://github.com/.extraheader || true
@@ -110,44 +110,32 @@ jobs:
             sleep 5
           done
 
-          # Clone Repositories
+          # Clone Repositories cleanly
           git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm || git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm
-          
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs || git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
-          cp -r hybris/droid-configs/rpm/* hybris/droid-configs/ 2>/dev/null || true
-
-          # Create identical internal structure so the %include macro finds the files
-          mkdir -p rpm/rpm
-          cp -r rpm/dhd rpm/rpm/ 2>/dev/null || true
 
           export PORT_ARCH=$SFOS_ARCH
           
-          # sb2 chroot strictly breaks on symlinks. Create a real physical directory instead!
-          sudo rm -rf dhd
-          cp -r rpm dhd
-          
-          sudo chmod +x dhd/dhd/helpers/build_packages.sh
           sudo chmod +x rpm/dhd/helpers/build_packages.sh
           sudo chmod 777 $GITHUB_WORKSPACE
-          
-          # FIX: Added 'dhd' to the 777 permission list so Docker can create the .mb2 output folder inside it
-          sudo chmod -R 777 rpm dhd hybris droid-local-repo
+          sudo chmod -R 777 rpm hybris droid-local-repo
 
-          docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -w /share \
+          # FIX: Mount the workspace into the /home/mersdk/ directory so scratchbox2 permits write access
+          docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
             -e VENDOR=$VENDOR \
             -e HABUILD_DEVICE=$DEVICE \
-            -e ANDROID_ROOT=/share \
-            -e HABUILD_DIR=/share \
-            -e PORT_ROOT=/share \
+            -e ANDROID_ROOT=/home/mersdk/share \
+            -e HABUILD_DIR=/home/mersdk/share \
+            -e PORT_ROOT=/home/mersdk/share \
             -e SFOS_RELEASE=$SFOS_RELEASE \
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
               set -e
               
-              # Explicitly map the build paths to the new physical directory
-              export DHD_DIR=/share/dhd
-              export CONFIGS_DIR=/share/hybris/droid-configs
+              # Variables correctly map to the new home path
+              export DHD_DIR=/home/mersdk/share/rpm
+              export CONFIGS_DIR=/home/mersdk/share/hybris/droid-configs
               
               if ! sdk-assistant list 2>/dev/null | grep -q \"\${VENDOR}-\${DEVICE}-\${PORT_ARCH}\"; then
                 echo 'Creating device-specific SDK target...'
@@ -156,8 +144,8 @@ jobs:
                 echo 'Device-specific SDK target already exists, skipping creation.'
               fi
               
-              ./dhd/dhd/helpers/build_packages.sh -b dhd
-              ./dhd/dhd/helpers/build_packages.sh -b configs
+              ./rpm/dhd/helpers/build_packages.sh -b dhd
+              ./rpm/dhd/helpers/build_packages.sh -b configs
             "
 
       # ==========================================
