@@ -97,7 +97,6 @@ jobs:
 
           bash ci/build.sh
 
-          # Use sudo to force-remove folders created by root in previous failed Docker runs
           sudo rm -rf rpm hybris droid-local-repo dhd
           mkdir -p hybris droid-local-repo
 
@@ -119,12 +118,12 @@ jobs:
           export PORT_ARCH=$SFOS_ARCH
           sudo chmod +x rpm/dhd/helpers/build_packages.sh
 
-          # Use sudo to ensure runner can change permissions on all files
           sudo chmod 777 $GITHUB_WORKSPACE
           sudo chmod -R 777 rpm hybris droid-local-repo
           
           ln -snf rpm dhd
 
+          # FIX: Explicitly pass TARGET and RELEASE to force the script to use the container's pre-built target
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/share -w /share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
@@ -133,6 +132,8 @@ jobs:
             -e ANDROID_ROOT=/share \
             -e HABUILD_DIR=/share \
             -e PORT_ROOT=/share \
+            -e RELEASE=$SFOS_RELEASE \
+            -e TARGET=SailfishOS-$SFOS_RELEASE-$SFOS_ARCH \
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "export DHD_DIR=/share/rpm && export RPM_DIR=/share/rpm && export CONFIGS_DIR=/share/hybris/droid-configs && ./rpm/dhd/helpers/build_packages.sh -b dhd && ./rpm/dhd/helpers/build_packages.sh -b configs"
 
       # ==========================================
