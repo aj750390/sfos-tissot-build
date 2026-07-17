@@ -109,6 +109,9 @@ jobs:
 
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           
+          # FIX: Automatically inject the 64-bit macro into the .spec file so the compiler doesn't halt
+          sed -i '1s/^/%define droid_target_aarch64 1\n/' rpm/droid-hal-tissot.spec
+          
           rm -rf rpm/rpm/dhd
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
           
@@ -119,9 +122,7 @@ jobs:
 
           ln -snf rpm dhd
 
-          # FIX: Inject relative symlinks of the Android root into the 'rpm' folder.
-          # The mb2 compiler heavily restricts the build environment to the repository folder. 
-          # These symlinks allow the compiler to securely read the necessary Android assets.
+          # Inject relative symlinks of the Android root into the 'rpm' folder
           for d in *; do
             if [ "$d" != "rpm" ] && [ "$d" != "dhd" ] && [ "$d" != "droid-local-repo" ] && [ "$d" != ".mb2" ]; then
               ln -snf "../$d" "rpm/$d"
