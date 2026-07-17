@@ -98,10 +98,7 @@ jobs:
           bash ci/build.sh
 
           sudo rm -rf dhd hybris/droid-configs droid-local-repo rpm .mb2
-          mkdir -p hybris droid-local-repo 
-          
-          # FIX: Create the critical anchor folder so the compiler maps the entire Android Root
-          mkdir -p .mb2
+          mkdir -p hybris droid-local-repo .mb2
 
           echo "Testing connection to GitLab..."
           for i in {1..3}; do
@@ -121,6 +118,15 @@ jobs:
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
 
           ln -snf rpm dhd
+
+          # FIX: Inject relative symlinks of the Android root into the 'rpm' folder.
+          # The mb2 compiler heavily restricts the build environment to the repository folder. 
+          # These symlinks allow the compiler to securely read the necessary Android assets.
+          for d in *; do
+            if [ "$d" != "rpm" ] && [ "$d" != "dhd" ] && [ "$d" != "droid-local-repo" ] && [ "$d" != ".mb2" ]; then
+              ln -snf "../$d" "rpm/$d"
+            fi
+          done
 
           export PORT_ARCH=$SFOS_ARCH
           
