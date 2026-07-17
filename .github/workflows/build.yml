@@ -110,17 +110,21 @@ jobs:
             sleep 5
           done
 
-          # Clone Repositories cleanly
           git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm || git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs || git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
 
           export PORT_ARCH=$SFOS_ARCH
           
+          # FIX: Bring back the physical dhd copy for the script to use
+          cp -r rpm dhd
+          
           sudo chmod +x rpm/dhd/helpers/build_packages.sh
           sudo chmod 777 $GITHUB_WORKSPACE
-          sudo chmod -R 777 rpm hybris droid-local-repo
+          
+          # Ensure Docker has 777 access to the new dhd folder as well
+          sudo chmod -R 777 rpm dhd hybris droid-local-repo
 
-          # FIX: Mount the workspace into the /home/mersdk/ directory so scratchbox2 permits write access
+          # Run in the /home/mersdk/share safe zone
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
@@ -133,7 +137,6 @@ jobs:
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
               set -e
               
-              # Variables correctly map to the new home path
               export DHD_DIR=/home/mersdk/share/rpm
               export CONFIGS_DIR=/home/mersdk/share/hybris/droid-configs
               
