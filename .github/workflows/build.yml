@@ -107,21 +107,24 @@ jobs:
             sleep 5
           done
 
-          # FIX 1: Clone into 'rpm' so the script's sanity check passes
+          # Clone into 'rpm' so the script's sanity check passes
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           
-          # FIX 2: Clone submodule into the repo's specific 'rpm/dhd' folder so the .spec include macro finds it
+          # Clone submodule into the repo's specific 'rpm/dhd' folder
           rm -rf rpm/rpm/dhd
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
           
+          # FIX: Clone the missing mer-kernel-check tool into the hybris folder
+          rm -rf hybris/mer-kernel-check
+          git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
+          
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
 
-          # FIX 3: Create the critical symlink so 'pushd dhd' finds the repo!
+          # Create the critical symlink so 'pushd dhd' finds the repo!
           ln -snf rpm dhd
 
           export PORT_ARCH=$SFOS_ARCH
           
-          # Update chmod path to match the new correct submodule location
           sudo chmod +x dhd/rpm/dhd/helpers/build_packages.sh
           
           sudo chmod 777 $GITHUB_WORKSPACE
