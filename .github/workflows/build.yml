@@ -95,6 +95,27 @@ jobs:
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.lex.c_shipped || true
           sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.l || true
 
+          # FIX: Inject missing Sailfish OS kernel configs to pass the verification check
+          echo "Patching kernel configs for Sailfish OS requirements..."
+          for conf in $(find kernel/xiaomi/msm8953/arch/arm64/configs -name "*defconfig"); do
+            sed -i '/CONFIG_NETFILTER_XT_MATCH_NFACCT/d' "$conf"
+            sed -i '/CONFIG_BLK_CGROUP/d' "$conf"
+            sed -i '/CONFIG_SUNRPC/d' "$conf"
+            echo "CONFIG_NETFILTER_XT_MATCH_NFACCT=y" >> "$conf"
+            echo "CONFIG_BLK_CGROUP=y" >> "$conf"
+            echo "CONFIG_SUNRPC=y" >> "$conf"
+          done
+          
+          # Patch the generated config so the compiler automatically triggers an incremental kernel rebuild
+          if [ -f "out/target/product/tissot/obj/KERNEL_OBJ/.config" ]; then
+            sed -i '/CONFIG_NETFILTER_XT_MATCH_NFACCT/d' "out/target/product/tissot/obj/KERNEL_OBJ/.config"
+            sed -i '/CONFIG_BLK_CGROUP/d' "out/target/product/tissot/obj/KERNEL_OBJ/.config"
+            sed -i '/CONFIG_SUNRPC/d' "out/target/product/tissot/obj/KERNEL_OBJ/.config"
+            echo "CONFIG_NETFILTER_XT_MATCH_NFACCT=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
+            echo "CONFIG_BLK_CGROUP=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
+            echo "CONFIG_SUNRPC=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
+          fi
+
           bash ci/build.sh
 
           sudo rm -rf dhd hybris/droid-configs droid-local-repo rpm .mb2
@@ -109,7 +130,6 @@ jobs:
 
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           
-          # FIX: Added the nested 'rpm/' to correctly target the spec file
           sed -i '1s/^/%define droid_target_aarch64 1\n/' rpm/rpm/droid-hal-tissot.spec
           
           rm -rf rpm/rpm/dhd
