@@ -98,29 +98,17 @@ jobs:
           # Finalized Kernel Patching
           echo "Patching kernel configs for Sailfish OS requirements..."
           for conf in $(find kernel/xiaomi/msm8953/arch/arm64/configs -name "*defconfig"); do
-            sed -i '/CONFIG_NETFILTER_XT_MATCH_NFACCT/d' "$conf"
-            sed -i '/CONFIG_BLK_CGROUP/d' "$conf"
-            sed -i '/CONFIG_SUNRPC/d' "$conf"
-            sed -i '/CONFIG_NETFILTER_XT_MATCH_SCTP/d' "$conf"
-            sed -i '/CONFIG_UTS_NS/d' "$conf"
-            echo "CONFIG_NETFILTER_XT_MATCH_NFACCT=y" >> "$conf"
-            echo "CONFIG_BLK_CGROUP=y" >> "$conf"
-            echo "CONFIG_SUNRPC=y" >> "$conf"
-            echo "CONFIG_NETFILTER_XT_MATCH_SCTP=y" >> "$conf"
-            echo "CONFIG_UTS_NS=y" >> "$conf"
+            for flag in CONFIG_NETFILTER_XT_MATCH_NFACCT CONFIG_BLK_CGROUP CONFIG_SUNRPC CONFIG_NETFILTER_XT_MATCH_SCTP CONFIG_UTS_NS CONFIG_LOCKD CONFIG_AUTOFS4_FS; do
+              sed -i "/$flag/d" "$conf"
+              echo "$flag=y" >> "$conf"
+            done
           done
           
           if [ -f "out/target/product/tissot/obj/KERNEL_OBJ/.config" ]; then
-            sed -i '/CONFIG_NETFILTER_XT_MATCH_NFACCT/d' "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            sed -i '/CONFIG_BLK_CGROUP/d' "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            sed -i '/CONFIG_SUNRPC/d' "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            sed -i '/CONFIG_NETFILTER_XT_MATCH_SCTP/d' "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            sed -i '/CONFIG_UTS_NS/d' "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            echo "CONFIG_NETFILTER_XT_MATCH_NFACCT=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            echo "CONFIG_BLK_CGROUP=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            echo "CONFIG_SUNRPC=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            echo "CONFIG_NETFILTER_XT_MATCH_SCTP=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            echo "CONFIG_UTS_NS=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
+            for flag in CONFIG_NETFILTER_XT_MATCH_NFACCT CONFIG_BLK_CGROUP CONFIG_SUNRPC CONFIG_NETFILTER_XT_MATCH_SCTP CONFIG_UTS_NS CONFIG_LOCKD CONFIG_AUTOFS4_FS; do
+              sed -i "/$flag/d" "out/target/product/tissot/obj/KERNEL_OBJ/.config"
+              echo "$flag=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
+            done
           fi
 
           bash ci/build.sh
