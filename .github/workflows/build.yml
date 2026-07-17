@@ -107,22 +107,21 @@ jobs:
             sleep 5
           done
 
-          # FIX 1: Clone directly into 'dhd' instead of 'rpm' to standardise the folder structure
-          git clone https://gitlab.com/aj750390/droid-hal-tissot.git dhd
+          # FIX 1: Clone back into 'rpm' so the script sees the folder it expects
+          git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           
-          # FIX 2: Manually clone the missing submodule so the .inc file exists exactly where expected
-          rm -rf dhd/rpm/dhd
-          git clone https://github.com/mer-hybris/droid-hal-device.git dhd/rpm/dhd
+          # FIX 2: Clone the missing submodule into rpm/dhd
+          rm -rf rpm/dhd
+          git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
           
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
 
           export PORT_ARCH=$SFOS_ARCH
           
-          # Make the helper script executable in its new correct location
-          sudo chmod +x dhd/rpm/dhd/helpers/build_packages.sh
+          sudo chmod +x rpm/dhd/helpers/build_packages.sh
           
           sudo chmod 777 $GITHUB_WORKSPACE
-          sudo chmod -R 777 dhd hybris droid-local-repo
+          sudo chmod -R 777 rpm hybris droid-local-repo
 
           # Run in the /home/mersdk/share safe zone
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
@@ -137,8 +136,8 @@ jobs:
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
               set -e
               
-              # Standard Sailfish paths
-              export DHD_DIR=/home/mersdk/share/dhd
+              # Standard Sailfish paths mapping to the new safe zone
+              export DHD_DIR=/home/mersdk/share/rpm
               export CONFIGS_DIR=/home/mersdk/share/hybris/droid-configs
               
               if ! sdk-assistant list 2>/dev/null | grep -q \"\${VENDOR}-\${DEVICE}-\${PORT_ARCH}\"; then
@@ -148,8 +147,9 @@ jobs:
                 echo 'Device-specific SDK target already exists, skipping creation.'
               fi
               
-              ./dhd/rpm/dhd/helpers/build_packages.sh -b dhd
-              ./dhd/rpm/dhd/helpers/build_packages.sh -b configs
+              # Execute script from the expected rpm/ directory
+              ./rpm/dhd/helpers/build_packages.sh -b dhd
+              ./rpm/dhd/helpers/build_packages.sh -b configs
             "
 
       # ==========================================
