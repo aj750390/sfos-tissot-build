@@ -97,8 +97,11 @@ jobs:
 
           bash ci/build.sh
 
-          sudo rm -rf dhd hybris/droid-configs droid-local-repo rpm
-          mkdir -p hybris droid-local-repo
+          sudo rm -rf dhd hybris/droid-configs droid-local-repo rpm .mb2
+          mkdir -p hybris droid-local-repo 
+          
+          # FIX: Create the critical anchor folder so the compiler maps the entire Android Root
+          mkdir -p .mb2
 
           echo "Testing connection to GitLab..."
           for i in {1..3}; do
@@ -107,20 +110,16 @@ jobs:
             sleep 5
           done
 
-          # Clone into 'rpm' so the script's sanity check passes
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           
-          # Clone submodule into the repo's specific 'rpm/dhd' folder
           rm -rf rpm/rpm/dhd
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
           
-          # FIX: Clone the missing mer-kernel-check tool into the hybris folder
           rm -rf hybris/mer-kernel-check
           git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
           
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
 
-          # Create the critical symlink so 'pushd dhd' finds the repo!
           ln -snf rpm dhd
 
           export PORT_ARCH=$SFOS_ARCH
@@ -128,9 +127,8 @@ jobs:
           sudo chmod +x dhd/rpm/dhd/helpers/build_packages.sh
           
           sudo chmod 777 $GITHUB_WORKSPACE
-          sudo chmod -R 777 rpm dhd hybris droid-local-repo
+          sudo chmod -R 777 rpm dhd hybris droid-local-repo .mb2
 
-          # Run in the /home/mersdk/share safe zone
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
@@ -143,7 +141,6 @@ jobs:
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
               set -e
               
-              # Standard Sailfish paths mapping to the new safe zone
               export DHD_DIR=/home/mersdk/share/rpm
               export CONFIGS_DIR=/home/mersdk/share/hybris/droid-configs
               
@@ -154,7 +151,6 @@ jobs:
                 echo 'Device-specific SDK target already exists, skipping creation.'
               fi
               
-              # Execute script via the symlink path
               ./dhd/rpm/dhd/helpers/build_packages.sh -b dhd
               ./dhd/rpm/dhd/helpers/build_packages.sh -b configs
             "
