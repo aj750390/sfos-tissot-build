@@ -97,11 +97,8 @@ jobs:
 
           bash ci/build.sh
 
-          sudo rm -rf rpm hybris/droid-configs dhd
+          sudo rm -rf dhd hybris/droid-configs droid-local-repo rpm
           mkdir -p hybris droid-local-repo
-
-          git config --global --unset-all http.https://github.com/.extraheader || true
-          git config --local --unset-all http.https://github.com/.extraheader || true
 
           echo "Testing connection to GitLab..."
           for i in {1..3}; do
@@ -110,19 +107,22 @@ jobs:
             sleep 5
           done
 
-          git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm || git clone --recurse-submodules https://gitlab.com/aj750390/droid-hal-tissot.git rpm
-          git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs || git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
+          # FIX 1: Clone directly into 'dhd' instead of 'rpm' to standardise the folder structure
+          git clone https://gitlab.com/aj750390/droid-hal-tissot.git dhd
+          
+          # FIX 2: Manually clone the missing submodule so the .inc file exists exactly where expected
+          rm -rf dhd/rpm/dhd
+          git clone https://github.com/mer-hybris/droid-hal-device.git dhd/rpm/dhd
+          
+          git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
 
           export PORT_ARCH=$SFOS_ARCH
           
-          # FIX: Bring back the physical dhd copy for the script to use
-          cp -r rpm dhd
+          # Make the helper script executable in its new correct location
+          sudo chmod +x dhd/rpm/dhd/helpers/build_packages.sh
           
-          sudo chmod +x rpm/dhd/helpers/build_packages.sh
           sudo chmod 777 $GITHUB_WORKSPACE
-          
-          # Ensure Docker has 777 access to the new dhd folder as well
-          sudo chmod -R 777 rpm dhd hybris droid-local-repo
+          sudo chmod -R 777 dhd hybris droid-local-repo
 
           # Run in the /home/mersdk/share safe zone
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
@@ -137,7 +137,8 @@ jobs:
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
               set -e
               
-              export DHD_DIR=/home/mersdk/share/rpm
+              # Standard Sailfish paths
+              export DHD_DIR=/home/mersdk/share/dhd
               export CONFIGS_DIR=/home/mersdk/share/hybris/droid-configs
               
               if ! sdk-assistant list 2>/dev/null | grep -q \"\${VENDOR}-\${DEVICE}-\${PORT_ARCH}\"; then
@@ -147,8 +148,8 @@ jobs:
                 echo 'Device-specific SDK target already exists, skipping creation.'
               fi
               
-              ./rpm/dhd/helpers/build_packages.sh -b dhd
-              ./rpm/dhd/helpers/build_packages.sh -b configs
+              ./dhd/rpm/dhd/helpers/build_packages.sh -b dhd
+              ./dhd/rpm/dhd/helpers/build_packages.sh -b configs
             "
 
       # ==========================================
