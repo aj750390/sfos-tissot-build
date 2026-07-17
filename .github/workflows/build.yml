@@ -109,8 +109,8 @@ jobs:
 
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           
-          # FIX: Automatically inject the 64-bit macro into the .spec file so the compiler doesn't halt
-          sed -i '1s/^/%define droid_target_aarch64 1\n/' rpm/droid-hal-tissot.spec
+          # FIX: Added the nested 'rpm/' to correctly target the spec file
+          sed -i '1s/^/%define droid_target_aarch64 1\n/' rpm/rpm/droid-hal-tissot.spec
           
           rm -rf rpm/rpm/dhd
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
