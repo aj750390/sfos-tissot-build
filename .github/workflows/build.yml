@@ -98,14 +98,14 @@ jobs:
           # Finalized Kernel Patching
           echo "Patching kernel configs for Sailfish OS requirements..."
           for conf in $(find kernel/xiaomi/msm8953/arch/arm64/configs -name "*defconfig"); do
-            for flag in CONFIG_NETFILTER_XT_MATCH_NFACCT CONFIG_BLK_CGROUP CONFIG_SUNRPC CONFIG_NETFILTER_XT_MATCH_SCTP CONFIG_UTS_NS CONFIG_LOCKD CONFIG_AUTOFS4_FS; do
+            for flag in CONFIG_NETFILTER_XT_MATCH_NFACCT CONFIG_BLK_CGROUP CONFIG_SUNRPC CONFIG_NETFILTER_XT_MATCH_SCTP CONFIG_UTS_NS CONFIG_LOCKD CONFIG_AUTOFS4_FS CONFIG_NET_DROP_MONITOR; do
               sed -i "/$flag/d" "$conf"
               echo "$flag=y" >> "$conf"
             done
           done
           
           if [ -f "out/target/product/tissot/obj/KERNEL_OBJ/.config" ]; then
-            for flag in CONFIG_NETFILTER_XT_MATCH_NFACCT CONFIG_BLK_CGROUP CONFIG_SUNRPC CONFIG_NETFILTER_XT_MATCH_SCTP CONFIG_UTS_NS CONFIG_LOCKD CONFIG_AUTOFS4_FS; do
+            for flag in CONFIG_NETFILTER_XT_MATCH_NFACCT CONFIG_BLK_CGROUP CONFIG_SUNRPC CONFIG_NETFILTER_XT_MATCH_SCTP CONFIG_UTS_NS CONFIG_LOCKD CONFIG_AUTOFS4_FS CONFIG_NET_DROP_MONITOR; do
               sed -i "/$flag/d" "out/target/product/tissot/obj/KERNEL_OBJ/.config"
               echo "$flag=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
             done
