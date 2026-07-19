@@ -118,10 +118,11 @@ jobs:
           sed -i -E 's/print\s+line/print(line)/g' external/clang/clang-version-inc.py
           sed -i 's/iteritems()/items()/g' external/clang/clang-version-inc.py
           
-          # ---> NEW FIX FOR DHD RPM PACKAGING SCRIPT <---
+          # ---> FIX FOR DHD RPM PACKAGING SCRIPTS (TYPE ERRORS) <---
           sed -i 's/env python$/env python3/g' build/make/tools/fs_config/fs_config_generator.py || true
           sed -i 's/env python\r/env python3\r/g' build/make/tools/fs_config/fs_config_generator.py || true
           2to3 -w build/make/tools/fs_config/fs_config_generator.py || true
+          sed -i 's/lower <= value <= upper/int(lower) <= int(value) <= int(upper)/g' build/make/tools/fs_config/fs_config_generator.py || true
           # ----------------------------------------------
           
           2to3 -w bionic/libc/fs_config_generator.py
