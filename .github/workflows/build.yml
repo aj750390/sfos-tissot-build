@@ -186,12 +186,14 @@ jobs:
 
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           
-          # ---> FIX: PREPENDING FILES TO THE TOP OF THE SPEC FILE <---
+          # ---> NEW FIX: ADDED /bugreports AND EMPTY MANIFEST MACRO <---
           echo "Prepending straggler_files to the top of the spec file..."
           mv rpm/rpm/droid-hal-tissot.spec rpm/rpm/droid-hal-tissot.spec.bak
           cat << 'EOF' > rpm/rpm/droid-hal-tissot.spec
+          %define _empty_manifest_terminate_build 0
           %define droid_target_aarch64 1
           %define straggler_files \
+            /bugreports \
             /cache \
             /d \
             /dsp \
@@ -216,7 +218,7 @@ jobs:
           
           EOF
           cat rpm/rpm/droid-hal-tissot.spec.bak >> rpm/rpm/droid-hal-tissot.spec
-          # -----------------------------------------------------------
+          # -------------------------------------------------------------
 
           rm -rf rpm/rpm/dhd
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
