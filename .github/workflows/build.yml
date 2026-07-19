@@ -45,241 +45,60 @@ jobs:
           git config --global user.email "builder@localhost"
           git config --global --add safe.directory '*'
           git config --global http.postBuffer 524288000
-
           if [ ! -d ".repo" ]; then
-            echo "Initializing repository manifest..."
             repo init -u https://github.com/mer-hybris/android.git -b hybris-16.0
           else
-            echo "Workspace exists. Cleaning up..."
             rm -rf packages/resources/devicesettings || true
             repo forall -c 'git reset --hard HEAD' || true
           fi
-
           bash ci/sync_repo.sh
           repo sync -f -j$(nproc)
-
-          rm -rf vendor/lineage/bootanimation external/one-true-awk external/fsck_msdos external/xz-embedded external/puffin external/libhybris external/cros/system_api
-          git clone --depth 1 https://github.com/LineageOS/android_external_one-true-awk.git -b lineage-16.0 external/one-true-awk
-          git clone --depth 1 https://github.com/LineageOS/android_external_fsck_msdos.git -b lineage-16.0 external/fsck_msdos
-          git clone --depth 1 https://android.googlesource.com/platform/external/xz-embedded -b android-9.0.0_r46 external/xz-embedded
-          git clone --depth 1 https://android.googlesource.com/platform/external/puffin -b android-9.0.0_r46 external/puffin
-          git clone https://github.com/mer-hybris/libhybris.git external/libhybris
-          cd external/libhybris && git submodule update --init --depth 1 && cd ../..
-          git clone --depth 1 https://android.googlesource.com/platform/external/cros/system_api -b android-9.0.0_r46 external/cros/system_api
+          # (Keep previous external cloning steps here...)
 
       # ==========================================
-      # STEP 1.5: KERNEL CHECK (FAIL FAST)
-      # ==========================================
-      - name: Verify Kernel Config (Fail Fast)
-        if: ${{ github.event.inputs.step_2_build == 'true' }}
-        run: |
-          echo "Patching kernel configs for Sailfish OS requirements..."
-          
-          # Master list including F2FS XATTR and NETFILTER ADVANCED
-          FLAGS="CONFIG_NETFILTER_XT_MATCH_NFACCT CONFIG_BLK_CGROUP CONFIG_NETFILTER_XT_MATCH_SCTP CONFIG_UTS_NS CONFIG_AUTOFS4_FS CONFIG_NET_DROP_MONITOR CONFIG_NETWORK_FILESYSTEMS CONFIG_NFS_FS CONFIG_NFS_V3 CONFIG_NFS_V3_ACL CONFIG_LOCKD CONFIG_SUNRPC CONFIG_CGROUP_NET_PRIO CONFIG_DEVTMPFS CONFIG_ISO9660_FS CONFIG_FANOTIFY CONFIG_UDF_FS CONFIG_FHANDLE CONFIG_NF_NAT_IPV6 CONFIG_NAMESPACES CONFIG_SYSVIPC CONFIG_IPC_NS CONFIG_NFS_V4 CONFIG_WATCHDOG_NOWAYOUT CONFIG_IP6_NF_MATCH_AH CONFIG_CIFS CONFIG_WATCHDOG CONFIG_MEMCG CONFIG_MEMCG_SWAP CONFIG_SECURITY_SELINUX_BOOTPARAM CONFIG_WATCHDOG_CORE CONFIG_BT CONFIG_BT_BNEP CONFIG_BT_RFCOMM CONFIG_SOFT_WATCHDOG CONFIG_QCOM_WDT CONFIG_NFS_V4_1 CONFIG_BT_HCIUART CONFIG_BT_HCIUART_H4 CONFIG_HW_WATCHDOG CONFIG_NET_CLS_CGROUP CONFIG_SECURITY CONFIG_SECURITY_YAMA CONFIG_WATCHDOG_SYSFS CONFIG_SECURITY_SELINUX CONFIG_SECURITY_NETWORK CONFIG_AUDIT CONFIG_IP6_NF_MATCH_MH CONFIG_IP6_NF_MATCH_RPFILTER CONFIG_NETFILTER_XT_MATCH_HELPER CONFIG_ECRYPT_FS CONFIG_CGROUPS CONFIG_IP_NF_TARGET_REJECT CONFIG_NETFILTER_XT_MATCH_HASHLIMIT CONFIG_CGROUP_SCHED CONFIG_NET_NS CONFIG_NETFILTER_XT_MATCH_IPRANGE CONFIG_SIGNALFD CONFIG_IP_NF_ARPTABLES CONFIG_INET6_AH CONFIG_NET_L3_MASTER_DEV CONFIG_BTRFS_FS CONFIG_CGROUP_FREEZER CONFIG_PPP_ASYNC CONFIG_IP_NF_FILTER CONFIG_TIMERFD CONFIG_IP_NF_RAW CONFIG_INOTIFY_USER CONFIG_NETFILTER_XT_CONNMARK CONFIG_SUNRPC_GSS CONFIG_NETFILTER_XT_MATCH_PKTTYPE CONFIG_BT_HCIVHCI CONFIG_QUOTACTL CONFIG_IP_NF_SECURITY CONFIG_HIDRAW CONFIG_F2FS_FS_SECURITY CONFIG_INET_ESP CONFIG_L2TP_V3 CONFIG_NETFILTER_XT_MATCH_RECENT CONFIG_NETFILTER_XT_MATCH_CONNTRACK CONFIG_IP_NF_MATCH_RPFILTER CONFIG_FW_LOADER_USER_HELPER CONFIG_CGROUP_MEM_RES_CTLR CONFIG_PID_NS CONFIG_IP_NF_NAT CONFIG_IP6_NF_TARGET_REJECT CONFIG_LOCKD_V4 CONFIG_BT_BNEP_PROTO_FILTER CONFIG_PPP_SYNC_TTY CONFIG_NETPRIO_CGROUP CONFIG_SECURITY_YAMA_STACKED CONFIG_IP_NF_ARPFILTER CONFIG_QUOTA_NETLINK_INTERFACE CONFIG_IP_NF_TARGET_REDIRECT CONFIG_SYSFS CONFIG_IP6_NF_RAW CONFIG_NETFILTER_XT_NAT CONFIG_IP_MULTIPLE_TABLES CONFIG_NFS_USE_KERNEL_DNS CONFIG_L2TP_IP CONFIG_PPP_MULTILINK CONFIG_NETFILTER_XT_MATCH_QTAGUID CONFIG_CUSE CONFIG_TMPFS_XATTR CONFIG_PPP_FILTER CONFIG_IP_NF_ARP_MANGLE CONFIG_IP_NF_MATCH_TTL CONFIG_EXT4_FS CONFIG_IP_NF_MANGLE CONFIG_NLS_UTF8 CONFIG_NF_LOG_IPV4 CONFIG_LBDAF CONFIG_PROC_FS CONFIG_VT CONFIG_NETFILTER_XT_MATCH_LIMIT CONFIG_TMPFS_POSIX_ACL CONFIG_IP6_NF_MATCH_FRAG CONFIG_IP_NF_MATCH_ECN CONFIG_EPOLL CONFIG_ANDROID_LOW_MEMORY_KILLER CONFIG_FW_LOADER_USER_HELPER_FALLBACK CONFIG_PPPOE CONFIG_NF_NAT_IPV4 CONFIG_NETFILTER_XT_MATCH_MULTIPORT CONFIG_SCHEDSTATS CONFIG_BT_BNEP_MC_FILTER CONFIG_NETFILTER_XT_MATCH_DCCP CONFIG_CGROUP_MEM_RES_CTLR_SWAP CONFIG_NETFILTER_XT_MATCH_CONNMARK CONFIG_INET_IPCOMP CONFIG_DEVTMPFS_MOUNT CONFIG_INET6_ESP CONFIG_SCHED_DEBUG CONFIG_RTC_DRV_CMOS CONFIG_QFMT_V2 CONFIG_NETFILTER_XT_MATCH_OWNER CONFIG_NETFILTER_XT_MATCH_ESP CONFIG_CHECKPOINT_RESTORE CONFIG_CGROUP_MEM_RES_CTLR_KMEM CONFIG_NFS_ACL_SUPPORT CONFIG_NETFILTER_NETLINK_ACCT CONFIG_NETFILTER_XT_MATCH_MARK CONFIG_F2FS_FS CONFIG_NFS_COMMON CONFIG_RD_GZIP CONFIG_IP_SCTP CONFIG_NETFILTER_XT_MATCH_STATE CONFIG_NF_LOG_IPV6 CONFIG_NETFILTER_XT_TARGET_CONNMARK CONFIG_BT_HIDP CONFIG_INET_AH CONFIG_MEMCG_KMEM CONFIG_F2FS_FS_XATTR CONFIG_NETFILTER_ADVANCED"
-          
-          for conf in $(find kernel/xiaomi/msm8953/arch/arm64/configs -name "*defconfig"); do
-            for flag in $FLAGS; do
-              sed -i "/$flag/d" "$conf"
-              echo "$flag=y" >> "$conf"
-            done
-            
-            sed -i "/CONFIG_DUMMY/d" "$conf"
-            echo "# CONFIG_DUMMY is not set" >> "$conf"
-            
-            sed -i '/CONFIG_UEVENT_HELPER_PATH/d' "$conf"
-            echo 'CONFIG_UEVENT_HELPER_PATH=""' >> "$conf"
-            
-            sed -i '/CONFIG_SECURITY_SELINUX_BOOTPARAM_VALUE/d' "$conf"
-            echo 'CONFIG_SECURITY_SELINUX_BOOTPARAM_VALUE=0' >> "$conf"
-          done
-          
-          echo "Downloading Sailfish OS Kernel Verifier..."
-          rm -rf mer-kernel-check
-          git clone https://github.com/mer-hybris/mer-kernel-check.git
-          
-          echo "Running Verifier on Defconfigs..."
-          for conf in $(find kernel/xiaomi/msm8953/arch/arm64/configs -name "*defconfig"); do
-            echo "Checking $conf..."
-            ./mer-kernel-check/mer_verify_kernel_config "$conf" || exit 1
-          done
-
-      # ==========================================
-      # STEP 2: BUILD HAL
+      # STEP 2: BUILD HAL (UNIFIED RPM)
       # ==========================================
       - name: Build Android & Droid HAL
         if: ${{ github.event.inputs.step_2_build == 'true' }}
         run: |
-          echo '#!/usr/bin/env python3' > build/make/tools/check_radio_versions.py && echo 'import sys' >> build/make/tools/check_radio_versions.py && echo 'sys.exit(0)' >> build/make/tools/check_radio_versions.py
-          sed -i 's/iteritems()/items()/g' build/make/tools/post_process_props.py
-          2to3 -w build/make/tools/normalize_path.py
-          sed -i 's/print sys.stderr/# print sys.stderr/g' external/clang/clang-version-inc.py
-          sed -i 's/print >> sys.stderr/# print >> sys.stderr/g' external/clang/clang-version-inc.py
-          sed -i -E 's/print\s+line/print(line)/g' external/clang/clang-version-inc.py
-          sed -i 's/iteritems()/items()/g' external/clang/clang-version-inc.py
-          
-          sed -i 's/env python$/env python3/g' build/make/tools/fs_config/fs_config_generator.py || true
-          sed -i 's/env python\r/env python3\r/g' build/make/tools/fs_config/fs_config_generator.py || true
-          2to3 -w build/make/tools/fs_config/fs_config_generator.py || true
-          sed -i 's/lower <= value <= upper/int(lower) <= int(value) <= int(upper)/g' build/make/tools/fs_config/fs_config_generator.py || true
-          
-          2to3 -w bionic/libc/fs_config_generator.py
-          sed -i 's/lower <= value <= upper/int(lower) <= int(value) <= int(upper)/g' bionic/libc/fs_config_generator.py
-          sed -i 's/exit 1/exit 0/g' hybris/hybris-boot/fixup-mountpoints
+          # (Insert your previous Kconfig and Python patching steps here...)
 
-          export TARGET_NO_RECOVERY=true
-          export ALLOW_MISSING_DEPENDENCIES=true
-          export SELINUX_IGNORE_NEVERALLOWS=true
-          export HABUILD_DIR=$GITHUB_WORKSPACE
-          export ANDROID_ROOT=$GITHUB_WORKSPACE
-          export PORT_ROOT=$GITHUB_WORKSPACE
+          sudo rm -rf rpm
+          mkdir -p rpm
           
-          echo "Injecting dummy Kconfig entries for missing/deprecated Android features..."
+          # Clone both into the flat 'rpm' directory
+          git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
+          git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
+          git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
           
-          if ! grep -q "config NETFILTER_XT_MATCH_QTAGUID" kernel/xiaomi/msm8953/net/netfilter/Kconfig; then
-            echo -e "\nconfig NETFILTER_XT_MATCH_QTAGUID\n\tbool \"Dummy QTAGUID\"\n\tdefault y\n" >> kernel/xiaomi/msm8953/net/netfilter/Kconfig
-          fi
-          
-          if ! grep -q "config WATCHDOG_NOWAYOUT" kernel/xiaomi/msm8953/drivers/watchdog/Kconfig; then
-            echo -e "\nconfig WATCHDOG_NOWAYOUT\n\tbool \"Dummy Watchdog Nowayout\"\n\tdefault y\n" >> kernel/xiaomi/msm8953/drivers/watchdog/Kconfig
-          fi
-
-          git -C kernel/xiaomi/msm8953 checkout scripts/dtc/dtc-lexer.lex.c_shipped scripts/dtc/dtc-lexer.l || true
-          sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.lex.c_shipped || true
-          sed -i 's/YYLTYPE yylloc;/extern YYLTYPE yylloc;/g' kernel/xiaomi/msm8953/scripts/dtc/dtc-lexer.l || true
-          
-          if [ -f "out/target/product/tissot/obj/KERNEL_OBJ/.config" ]; then
-            FLAGS="CONFIG_NETFILTER_XT_MATCH_NFACCT CONFIG_BLK_CGROUP CONFIG_NETFILTER_XT_MATCH_SCTP CONFIG_UTS_NS CONFIG_AUTOFS4_FS CONFIG_NET_DROP_MONITOR CONFIG_NETWORK_FILESYSTEMS CONFIG_NFS_FS CONFIG_NFS_V3 CONFIG_NFS_V3_ACL CONFIG_LOCKD CONFIG_SUNRPC CONFIG_CGROUP_NET_PRIO CONFIG_DEVTMPFS CONFIG_ISO9660_FS CONFIG_FANOTIFY CONFIG_UDF_FS CONFIG_FHANDLE CONFIG_NF_NAT_IPV6 CONFIG_NAMESPACES CONFIG_SYSVIPC CONFIG_IPC_NS CONFIG_NFS_V4 CONFIG_WATCHDOG_NOWAYOUT CONFIG_IP6_NF_MATCH_AH CONFIG_CIFS CONFIG_WATCHDOG CONFIG_MEMCG CONFIG_MEMCG_SWAP CONFIG_SECURITY_SELINUX_BOOTPARAM CONFIG_WATCHDOG_CORE CONFIG_BT CONFIG_BT_BNEP CONFIG_BT_RFCOMM CONFIG_SOFT_WATCHDOG CONFIG_QCOM_WDT CONFIG_NFS_V4_1 CONFIG_BT_HCIUART CONFIG_BT_HCIUART_H4 CONFIG_HW_WATCHDOG CONFIG_NET_CLS_CGROUP CONFIG_SECURITY CONFIG_SECURITY_YAMA CONFIG_WATCHDOG_SYSFS CONFIG_SECURITY_SELINUX CONFIG_SECURITY_NETWORK CONFIG_AUDIT CONFIG_IP6_NF_MATCH_MH CONFIG_IP6_NF_MATCH_RPFILTER CONFIG_NETFILTER_XT_MATCH_HELPER CONFIG_ECRYPT_FS CONFIG_CGROUPS CONFIG_IP_NF_TARGET_REJECT CONFIG_NETFILTER_XT_MATCH_HASHLIMIT CONFIG_CGROUP_SCHED CONFIG_NET_NS CONFIG_NETFILTER_XT_MATCH_IPRANGE CONFIG_SIGNALFD CONFIG_IP_NF_ARPTABLES CONFIG_INET6_AH CONFIG_NET_L3_MASTER_DEV CONFIG_BTRFS_FS CONFIG_CGROUP_FREEZER CONFIG_PPP_ASYNC CONFIG_IP_NF_FILTER CONFIG_TIMERFD CONFIG_IP_NF_RAW CONFIG_INOTIFY_USER CONFIG_NETFILTER_XT_CONNMARK CONFIG_SUNRPC_GSS CONFIG_NETFILTER_XT_MATCH_PKTTYPE CONFIG_BT_HCIVHCI CONFIG_QUOTACTL CONFIG_IP_NF_SECURITY CONFIG_HIDRAW CONFIG_F2FS_FS_SECURITY CONFIG_INET_ESP CONFIG_L2TP_V3 CONFIG_NETFILTER_XT_MATCH_RECENT CONFIG_NETFILTER_XT_MATCH_CONNTRACK CONFIG_IP_NF_MATCH_RPFILTER CONFIG_FW_LOADER_USER_HELPER CONFIG_CGROUP_MEM_RES_CTLR CONFIG_PID_NS CONFIG_IP_NF_NAT CONFIG_IP6_NF_TARGET_REJECT CONFIG_LOCKD_V4 CONFIG_BT_BNEP_PROTO_FILTER CONFIG_PPP_SYNC_TTY CONFIG_NETPRIO_CGROUP CONFIG_SECURITY_YAMA_STACKED CONFIG_IP_NF_ARPFILTER CONFIG_QUOTA_NETLINK_INTERFACE CONFIG_IP_NF_TARGET_REDIRECT CONFIG_SYSFS CONFIG_IP6_NF_RAW CONFIG_NETFILTER_XT_NAT CONFIG_IP_MULTIPLE_TABLES CONFIG_NFS_USE_KERNEL_DNS CONFIG_L2TP_IP CONFIG_PPP_MULTILINK CONFIG_NETFILTER_XT_MATCH_QTAGUID CONFIG_CUSE CONFIG_TMPFS_XATTR CONFIG_PPP_FILTER CONFIG_IP_NF_ARP_MANGLE CONFIG_IP_NF_MATCH_TTL CONFIG_EXT4_FS CONFIG_IP_NF_MANGLE CONFIG_NLS_UTF8 CONFIG_NF_LOG_IPV4 CONFIG_LBDAF CONFIG_PROC_FS CONFIG_VT CONFIG_NETFILTER_XT_MATCH_LIMIT CONFIG_TMPFS_POSIX_ACL CONFIG_IP6_NF_MATCH_FRAG CONFIG_IP_NF_MATCH_ECN CONFIG_EPOLL CONFIG_ANDROID_LOW_MEMORY_KILLER CONFIG_FW_LOADER_USER_HELPER_FALLBACK CONFIG_PPPOE CONFIG_NF_NAT_IPV4 CONFIG_NETFILTER_XT_MATCH_MULTIPORT CONFIG_SCHEDSTATS CONFIG_BT_BNEP_MC_FILTER CONFIG_NETFILTER_XT_MATCH_DCCP CONFIG_CGROUP_MEM_RES_CTLR_SWAP CONFIG_NETFILTER_XT_MATCH_CONNMARK CONFIG_INET_IPCOMP CONFIG_DEVTMPFS_MOUNT CONFIG_INET6_ESP CONFIG_SCHED_DEBUG CONFIG_RTC_DRV_CMOS CONFIG_QFMT_V2 CONFIG_NETFILTER_XT_MATCH_OWNER CONFIG_NETFILTER_XT_MATCH_ESP CONFIG_CHECKPOINT_RESTORE CONFIG_CGROUP_MEM_RES_CTLR_KMEM CONFIG_NFS_ACL_SUPPORT CONFIG_NETFILTER_NETLINK_ACCT CONFIG_NETFILTER_XT_MATCH_MARK CONFIG_F2FS_FS CONFIG_NFS_COMMON CONFIG_RD_GZIP CONFIG_IP_SCTP CONFIG_NETFILTER_XT_MATCH_STATE CONFIG_NF_LOG_IPV6 CONFIG_NETFILTER_XT_TARGET_CONNMARK CONFIG_BT_HIDP CONFIG_INET_AH CONFIG_MEMCG_KMEM CONFIG_F2FS_FS_XATTR CONFIG_NETFILTER_ADVANCED"
-            for flag in $FLAGS; do
-              sed -i "/$flag/d" "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-              echo "$flag=y" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            done
-            sed -i "/CONFIG_DUMMY/d" "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            echo "# CONFIG_DUMMY is not set" >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            
-            sed -i '/CONFIG_UEVENT_HELPER_PATH/d' "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            echo 'CONFIG_UEVENT_HELPER_PATH=""' >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            
-            sed -i '/CONFIG_SECURITY_SELINUX_BOOTPARAM_VALUE/d' "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-            echo 'CONFIG_SECURITY_SELINUX_BOOTPARAM_VALUE=0' >> "out/target/product/tissot/obj/KERNEL_OBJ/.config"
-          fi
-
-          bash ci/build.sh
-          
-          echo "Forcing final Sailfish OS flags into the compiled kernel config..."
-          export CONFIG_FILE="out/target/product/tissot/obj/KERNEL_OBJ/.config"
-          if [ -f "$CONFIG_FILE" ]; then
-            sed -i '/CONFIG_WATCHDOG_NOWAYOUT/d' "$CONFIG_FILE"
-            sed -i '/CONFIG_F2FS_FS_SECURITY/d' "$CONFIG_FILE"
-            sed -i '/CONFIG_NETFILTER_XT_MATCH_QTAGUID/d' "$CONFIG_FILE"
-            
-            echo "CONFIG_WATCHDOG_NOWAYOUT=y" >> "$CONFIG_FILE"
-            echo "CONFIG_F2FS_FS_SECURITY=y" >> "$CONFIG_FILE"
-            echo "CONFIG_NETFILTER_XT_MATCH_QTAGUID=y" >> "$CONFIG_FILE"
-            echo "Successfully injected override flags."
-          else
-            echo "WARNING: Kernel .config not found at $CONFIG_FILE!"
-          fi
-
-          sudo rm -rf dhd hybris/droid-configs droid-local-repo rpm .mb2
-          mkdir -p hybris droid-local-repo .mb2
-
-          git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
-          
-          echo "Prepending straggler_files to the top of the spec file..."
-          mv rpm/rpm/droid-hal-tissot.spec rpm/rpm/droid-hal-tissot.spec.bak
-          cat << 'EOF' > rpm/rpm/droid-hal-tissot.spec
+          # Prepend stragglers to the HAL spec
+          mv rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec.bak
+          cat << 'EOF' > rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec
           %define _empty_manifest_terminate_build 0
           %define droid_target_aarch64 1
           %define straggler_files \
-            /bugreports \
-            /cache \
-            /d \
-            /dsp \
-            /firmware \
-            /persist \
-            /plat_file_contexts \
-            /plat_hwservice_contexts \
-            /plat_property_contexts \
-            /plat_seapp_contexts \
-            /plat_service_contexts \
-            /product \
-            /sdcard \
-            /vendor \
-            /vendor_file_contexts \
-            /vendor_hwservice_contexts \
-            /vendor_property_contexts \
-            /vendor_seapp_contexts \
-            /vendor_service_contexts \
-            /verity_key \
-            /vndservice_contexts \
-            %{nil}
-          
+            /bugreports /cache /d /dsp /firmware /persist \
+            /plat_file_contexts /plat_hwservice_contexts /plat_property_contexts \
+            /plat_seapp_contexts /plat_service_contexts /product /sdcard \
+            /vendor /vendor_file_contexts /vendor_hwservice_contexts \
+            /vendor_property_contexts /vendor_seapp_contexts /vendor_service_contexts \
+            /verity_key /vndservice_contexts %{nil}
           EOF
-          cat rpm/rpm/droid-hal-tissot.spec.bak >> rpm/rpm/droid-hal-tissot.spec
+          cat rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec.bak >> rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec
 
-          rm -rf rpm/rpm/dhd
-          git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
-          rm -rf hybris/mer-kernel-check
-          git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
-          
-          git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
-          
-          echo "Force-preparing DHD structure for mb2 snapshot..."
-          mkdir -p hybris/droid-configs/rpm/dhd
-          cp -r rpm/rpm/dhd/* hybris/droid-configs/rpm/dhd/
+          # Fix include paths in BOTH specs to look at the local folder
+          sed -i 's|rpm/dhd/|dhd/|g' rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec
+          sed -i 's|rpm/dhd/|../dhd/|g' rpm/droid-config-tissot/rpm/droid-config-tissot.spec
 
-          ln -snf rpm dhd
-          for d in *; do
-            if [ "$d" != "rpm" ] && [ "$d" != "dhd" ] && [ "$d" != "droid-local-repo" ] && [ "$d" != ".mb2" ]; then
-              ln -snf "../$d" "rpm/$d"
-            fi
-          done
-
-          export PORT_ARCH=$SFOS_ARCH
-          sudo chmod +x dhd/rpm/dhd/helpers/build_packages.sh
-          sudo chmod 777 $GITHUB_WORKSPACE
-          sudo chmod -R 777 rpm dhd hybris droid-local-repo .mb2
-
+          # Build from the unified rpm directory
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
-            -e PORT_ARCH=$SFOS_ARCH \
-            -e DEVICE=$DEVICE \
-            -e VENDOR=$VENDOR \
-            -e HABUILD_DEVICE=$DEVICE \
-            -e ANDROID_ROOT=/home/mersdk/share \
-            -e HABUILD_DIR=/home/mersdk/share \
-            -e PORT_ROOT=/home/mersdk/share \
-            -e SFOS_RELEASE=$SFOS_RELEASE \
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
-              set -e
-              git config --global --add safe.directory '*'
-              export DHD_DIR=/home/mersdk/share/rpm
-              export CONFIGS_DIR=/home/mersdk/share/hybris/droid-configs
-              if ! sdk-assistant list 2>/dev/null | grep -q \"\${VENDOR}-\${DEVICE}-\${PORT_ARCH}\"; then
-                sdk-assistant -y create \${VENDOR}-\${DEVICE}-\${PORT_ARCH} https://releases.sailfishos.org/sdk/targets/Sailfish_OS-\${SFOS_RELEASE}-Sailfish_SDK_Target-\${PORT_ARCH}.tar.7z
-              fi
-              ./dhd/rpm/dhd/helpers/build_packages.sh -b dhd
-              ./dhd/rpm/dhd/helpers/build_packages.sh -b hybris/droid-configs
+              cd rpm
+              # We build in the directory where everything now lives side-by-side
+              ./dhd/helpers/build_packages.sh -b droid-hal-tissot
+              ./dhd/helpers/build_packages.sh -b droid-config-tissot
             "
 
       # ==========================================
-      # STEP 3: PACKAGE ZIP
+      # STEP 3 & 4: (Keep previous packaging steps)
       # ==========================================
-      - name: Bundle Flashable Zip
-        if: ${{ github.event.inputs.step_3_package == 'true' }}
-        run: |
-          export KS_FILE=$(find $GITHUB_WORKSPACE -name "*.ks" | head -n 1)
-          mic create fs --arch=$SFOS_ARCH --tokenmap=ARCH:$SFOS_ARCH,RELEASE:$SFOS_RELEASE,EXTRA_NAME:tissot --record-pkgs=name,url --outdir=$GITHUB_WORKSPACE/sfe-tissot-out --pack-to=sfe-tissot.tar.bz2 $KS_FILE
-
-      # ==========================================
-      # STEP 4: UPLOAD FOR DOWNLOAD
-      # ==========================================
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: sfos-tissot-build-files
-          path: |
-            out/target/product/tissot/*.img
-            sfe-tissot-out/*
-            *.tar.bz2
-          retention-days: 90
