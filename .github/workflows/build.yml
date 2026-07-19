@@ -222,21 +222,19 @@ jobs:
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
           rm -rf hybris/mer-kernel-check
           git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
-          
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
           
-          # ---> FIX: COMMIT DHD DIRECTLY INTO DROID-CONFIGS <---
-          echo "Injecting dhd directly into droid-configs git tree..."
+          # ---> FIX: ADD DHD PROPERLY AS A GIT SUBMODULE <---
+          echo "Registering dhd as a strict Git Submodule for mb2 compatibility..."
           cd hybris/droid-configs
-          rm -rf rpm/dhd
-          git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
-          rm -rf rpm/dhd/.git
           git config user.name "Builder"
           git config user.email "builder@localhost"
-          git add rpm/dhd
-          git commit -m "Manually inject dhd macros for mb2 snapshot"
+          rm -rf rpm/dhd
+          git rm -rf rpm/dhd 2>/dev/null || true
+          git submodule add https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
+          git commit -m "Initialize dhd submodule for mb2 snapshot" || true
           cd ../..
-          # -----------------------------------------------------
+          # --------------------------------------------------
 
           ln -snf rpm dhd
           for d in *; do
