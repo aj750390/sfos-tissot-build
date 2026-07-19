@@ -162,6 +162,24 @@ jobs:
           fi
 
           bash ci/build.sh
+          
+          # ==========================================
+          # THE FINAL OVERRIDE FOR RPM PACKAGING
+          # ==========================================
+          echo "Forcing final Sailfish OS flags into the compiled kernel config..."
+          export CONFIG_FILE="out/target/product/tissot/obj/KERNEL_OBJ/.config"
+          if [ -f "$CONFIG_FILE" ]; then
+            sed -i '/CONFIG_WATCHDOG_NOWAYOUT/d' "$CONFIG_FILE"
+            sed -i '/CONFIG_F2FS_FS_SECURITY/d' "$CONFIG_FILE"
+            sed -i '/CONFIG_NETFILTER_XT_MATCH_QTAGUID/d' "$CONFIG_FILE"
+            
+            echo "CONFIG_WATCHDOG_NOWAYOUT=y" >> "$CONFIG_FILE"
+            echo "CONFIG_F2FS_FS_SECURITY=y" >> "$CONFIG_FILE"
+            echo "CONFIG_NETFILTER_XT_MATCH_QTAGUID=y" >> "$CONFIG_FILE"
+            echo "Successfully injected override flags."
+          else
+            echo "WARNING: Kernel .config not found at $CONFIG_FILE!"
+          fi
 
           sudo rm -rf dhd hybris/droid-configs droid-local-repo rpm .mb2
           mkdir -p hybris droid-local-repo .mb2
