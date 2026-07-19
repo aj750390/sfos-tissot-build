@@ -118,12 +118,10 @@ jobs:
           sed -i -E 's/print\s+line/print(line)/g' external/clang/clang-version-inc.py
           sed -i 's/iteritems()/items()/g' external/clang/clang-version-inc.py
           
-          # ---> FIX FOR DHD RPM PACKAGING SCRIPTS (TYPE ERRORS) <---
           sed -i 's/env python$/env python3/g' build/make/tools/fs_config/fs_config_generator.py || true
           sed -i 's/env python\r/env python3\r/g' build/make/tools/fs_config/fs_config_generator.py || true
           2to3 -w build/make/tools/fs_config/fs_config_generator.py || true
           sed -i 's/lower <= value <= upper/int(lower) <= int(value) <= int(upper)/g' build/make/tools/fs_config/fs_config_generator.py || true
-          # ----------------------------------------------
           
           2to3 -w bionic/libc/fs_config_generator.py
           sed -i 's/lower <= value <= upper/int(lower) <= int(value) <= int(upper)/g' bionic/libc/fs_config_generator.py
@@ -136,9 +134,6 @@ jobs:
           export ANDROID_ROOT=$GITHUB_WORKSPACE
           export PORT_ROOT=$GITHUB_WORKSPACE
           
-          # ==========================================
-          # KCONFIG INJECTION HACK FOR SAILFISH
-          # ==========================================
           echo "Injecting dummy Kconfig entries for missing/deprecated Android features..."
           
           if ! grep -q "config NETFILTER_XT_MATCH_QTAGUID" kernel/xiaomi/msm8953/net/netfilter/Kconfig; then
@@ -171,9 +166,6 @@ jobs:
 
           bash ci/build.sh
           
-          # ==========================================
-          # THE FINAL OVERRIDE FOR RPM PACKAGING
-          # ==========================================
           echo "Forcing final Sailfish OS flags into the compiled kernel config..."
           export CONFIG_FILE="out/target/product/tissot/obj/KERNEL_OBJ/.config"
           if [ -f "$CONFIG_FILE" ]; then
@@ -194,6 +186,33 @@ jobs:
 
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           sed -i '1s/^/%define droid_target_aarch64 1\n/' rpm/rpm/droid-hal-tissot.spec
+          
+          # ---> FIX FOR UNPACKAGED ROOT FILES ERROR <---
+          echo "" >> rpm/rpm/droid-hal-tissot.spec
+          echo "%define straggler_files \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /cache \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /d \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /dsp \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /firmware \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /persist \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /plat_file_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /plat_hwservice_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /plat_property_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /plat_seapp_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /plat_service_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /product \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /sdcard \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /vendor \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /vendor_file_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /vendor_hwservice_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /vendor_property_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /vendor_seapp_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /vendor_service_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /verity_key \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  /vndservice_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
+          echo "  %{nil}" >> rpm/rpm/droid-hal-tissot.spec
+          # ----------------------------------------------
+
           rm -rf rpm/rpm/dhd
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
           rm -rf hybris/mer-kernel-check
