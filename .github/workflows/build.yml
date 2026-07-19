@@ -186,7 +186,6 @@ jobs:
 
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
           
-          # ---> NEW FIX: ADDED /bugreports AND EMPTY MANIFEST MACRO <---
           echo "Prepending straggler_files to the top of the spec file..."
           mv rpm/rpm/droid-hal-tissot.spec rpm/rpm/droid-hal-tissot.spec.bak
           cat << 'EOF' > rpm/rpm/droid-hal-tissot.spec
@@ -218,7 +217,6 @@ jobs:
           
           EOF
           cat rpm/rpm/droid-hal-tissot.spec.bak >> rpm/rpm/droid-hal-tissot.spec
-          # -------------------------------------------------------------
 
           rm -rf rpm/rpm/dhd
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
@@ -238,6 +236,7 @@ jobs:
           sudo chmod 777 $GITHUB_WORKSPACE
           sudo chmod -R 777 rpm dhd hybris droid-local-repo .mb2
 
+          # ---> FIX: UPDATED PATH FOR CONFIGS BUILD <---
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
@@ -255,8 +254,9 @@ jobs:
                 sdk-assistant -y create \${VENDOR}-\${DEVICE}-\${PORT_ARCH} https://releases.sailfishos.org/sdk/targets/Sailfish_OS-\${SFOS_RELEASE}-Sailfish_SDK_Target-\${PORT_ARCH}.tar.7z
               fi
               ./dhd/rpm/dhd/helpers/build_packages.sh -b dhd
-              ./dhd/rpm/dhd/helpers/build_packages.sh -b configs
+              ./dhd/rpm/dhd/helpers/build_packages.sh -b hybris/droid-configs
             "
+          # ----------------------------------------------
 
       # ==========================================
       # STEP 3: PACKAGE ZIP
