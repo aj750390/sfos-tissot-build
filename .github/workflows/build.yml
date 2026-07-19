@@ -223,30 +223,27 @@ jobs:
           rm -rf hybris/mer-kernel-check
           git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
           
-          # ---> FIX: FORCE FETCH AND FORCE TRACK THE DHD MACROS <---
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
-          echo "Force-fetching DHD into droid-configs..."
+          
+          # ---> FIX: ABSOLUTE PATH INJECTION <---
+          echo "Injecting absolute paths to bypass mb2 isolated directory failures..."
           cd hybris/droid-configs
           
-          # Attempt native submodule initialization first (Standard SDK method)
-          git submodule update --init --recursive || true
+          rm -rf rpm/dhd
+          git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
+          rm -rf rpm/dhd/.git
+          git config user.name "Builder"
+          git config user.email "builder@localhost"
+          git add -f rpm/dhd
+          git commit -m "Track dhd files locally" || true
           
-          # If the file is still missing after init, forcefully inject and track it
-          if [ ! -f "rpm/dhd/droid-config-device.inc" ]; then
-            echo "Submodule missing. Manually injecting and force tracking..."
-            rm -rf rpm/dhd
-            git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
-            rm -rf rpm/dhd/.git
-            
-            git config user.name "Builder"
-            git config user.email "builder@localhost"
-            
-            # The -f flag is STRICTLY required to bypass hidden .gitignore rules!
-            git add -f rpm/dhd
-            git commit -m "Force track dhd to bypass gitignore and mb2 snapshot constraints" || true
-          fi
+          # Force the .spec file to look strictly at the Docker environment absolute path
+          for spec in rpm/*.spec; do
+            sed -i 's|%include rpm/dhd/|%include /home/mersdk/share/hybris/droid-configs/rpm/dhd/|g' "$spec"
+            sed -i 's|%include dhd/|%include /home/mersdk/share/hybris/droid-configs/rpm/dhd/|g' "$spec"
+          done
           cd ../..
-          # ---------------------------------------------------------
+          # ----------------------------------------
 
           ln -snf rpm dhd
           for d in *; do
