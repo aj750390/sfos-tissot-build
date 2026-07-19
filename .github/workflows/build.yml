@@ -64,9 +64,11 @@ jobs:
           git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
           
-          # Run build in Docker with proper environment anchoring
+          # Run build in Docker
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e SFOS_RELEASE=$SFOS_RELEASE \
+            -e VENDOR=$VENDOR \
+            -e DEVICE=$DEVICE \
             -e ANDROID_ROOT=/home/mersdk/share \
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
               set -e
