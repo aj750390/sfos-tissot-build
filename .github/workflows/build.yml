@@ -81,9 +81,9 @@ jobs:
               # Link DHD to the root of the workspace so the script finds it
               [ ! -d /home/mersdk/share/dhd ] && ln -s /home/mersdk/share/rpm/dhd /home/mersdk/share/dhd
               
-              # Build packages with forced architecture target
-              /home/mersdk/share/dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot -a $SFOS_ARCH
-              /home/mersdk/share/dhd/helpers/build_packages.sh -b rpm/droid-config-tissot -a $SFOS_ARCH
+              # Build packages without the unsupported architecture flag
+              /home/mersdk/share/dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
+              /home/mersdk/share/dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
             "
 
       # ==========================================
