@@ -185,33 +185,38 @@ jobs:
           mkdir -p hybris droid-local-repo .mb2
 
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm
-          sed -i '1s/^/%define droid_target_aarch64 1\n/' rpm/rpm/droid-hal-tissot.spec
           
-          # ---> FIX FOR UNPACKAGED ROOT FILES ERROR <---
-          echo "" >> rpm/rpm/droid-hal-tissot.spec
-          echo "%define straggler_files \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /cache \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /d \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /dsp \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /firmware \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /persist \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /plat_file_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /plat_hwservice_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /plat_property_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /plat_seapp_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /plat_service_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /product \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /sdcard \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /vendor \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /vendor_file_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /vendor_hwservice_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /vendor_property_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /vendor_seapp_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /vendor_service_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /verity_key \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  /vndservice_contexts \\" >> rpm/rpm/droid-hal-tissot.spec
-          echo "  %{nil}" >> rpm/rpm/droid-hal-tissot.spec
-          # ----------------------------------------------
+          # ---> FIX: PREPENDING FILES TO THE TOP OF THE SPEC FILE <---
+          echo "Prepending straggler_files to the top of the spec file..."
+          mv rpm/rpm/droid-hal-tissot.spec rpm/rpm/droid-hal-tissot.spec.bak
+          cat << 'EOF' > rpm/rpm/droid-hal-tissot.spec
+          %define droid_target_aarch64 1
+          %define straggler_files \
+            /cache \
+            /d \
+            /dsp \
+            /firmware \
+            /persist \
+            /plat_file_contexts \
+            /plat_hwservice_contexts \
+            /plat_property_contexts \
+            /plat_seapp_contexts \
+            /plat_service_contexts \
+            /product \
+            /sdcard \
+            /vendor \
+            /vendor_file_contexts \
+            /vendor_hwservice_contexts \
+            /vendor_property_contexts \
+            /vendor_seapp_contexts \
+            /vendor_service_contexts \
+            /verity_key \
+            /vndservice_contexts \
+            %{nil}
+          
+          EOF
+          cat rpm/rpm/droid-hal-tissot.spec.bak >> rpm/rpm/droid-hal-tissot.spec
+          # -----------------------------------------------------------
 
           rm -rf rpm/rpm/dhd
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
