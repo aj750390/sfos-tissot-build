@@ -223,6 +223,11 @@ jobs:
           rm -rf hybris/mer-kernel-check
           git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
+          
+          # ---> FIX: ADD MISSING DHD SUBMODULE TO DROID-CONFIGS <---
+          rm -rf hybris/droid-configs/rpm/dhd
+          git clone https://github.com/mer-hybris/droid-hal-device.git hybris/droid-configs/rpm/dhd
+          # ---------------------------------------------------------
 
           ln -snf rpm dhd
           for d in *; do
@@ -236,7 +241,6 @@ jobs:
           sudo chmod 777 $GITHUB_WORKSPACE
           sudo chmod -R 777 rpm dhd hybris droid-local-repo .mb2
 
-          # ---> FIX: UPDATED PATH FOR CONFIGS BUILD <---
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
@@ -256,7 +260,6 @@ jobs:
               ./dhd/rpm/dhd/helpers/build_packages.sh -b dhd
               ./dhd/rpm/dhd/helpers/build_packages.sh -b hybris/droid-configs
             "
-          # ----------------------------------------------
 
       # ==========================================
       # STEP 3: PACKAGE ZIP
