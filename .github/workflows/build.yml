@@ -1,5 +1,4 @@
 name: Sailfish OS Tissot Build
-
 on:
   workflow_dispatch:
     inputs:
@@ -13,11 +12,6 @@ on:
         required: true
         type: boolean
         default: true
-      step_3_package:
-        description: 'Step 3: Package Flashable Zip'
-        required: true
-        type: boolean
-        default: true
 
 env:
   SFOS_RELEASE: "4.5.0.16"
@@ -28,77 +22,31 @@ env:
 jobs:
   compile:
     runs-on: self-hosted
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-        with:
-          clean: false
-
-      # ==========================================
-      # STEP 1: DOWNLOAD CODE
-      # ==========================================
-      - name: Prepare & Sync Source Code
-        if: ${{ github.event.inputs.step_1_download == 'true' }}
-        run: |
-          git config --global user.name "Builder"
-          git config --global user.email "builder@localhost"
-          git config --global --add safe.directory '*'
-          git config --global http.postBuffer 524288000
-          if [ ! -d ".repo" ]; then
-            repo init -u https://github.com/mer-hybris/android.git -b hybris-16.0
-          else
-            rm -rf packages/resources/devicesettings || true
-            repo forall -c 'git reset --hard HEAD' || true
-          fi
-          bash ci/sync_repo.sh
-          repo sync -f -j$(nproc)
-          # (Keep previous external cloning steps here...)
-
-      # ==========================================
-      # STEP 2: BUILD HAL (UNIFIED RPM)
-      # ==========================================
+      
       - name: Build Android & Droid HAL
         if: ${{ github.event.inputs.step_2_build == 'true' }}
         run: |
-          # (Insert your previous Kconfig and Python patching steps here...)
-
-          sudo rm -rf rpm
-          mkdir -p rpm
-          
-          # Clone both into the flat 'rpm' directory
+          # 1. Setup Standard Layout
+          mkdir -p rpm/dhd
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
           git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
           
-          # Prepend stragglers to the HAL spec
-          mv rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec.bak
-          cat << 'EOF' > rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec
-          %define _empty_manifest_terminate_build 0
-          %define droid_target_aarch64 1
-          %define straggler_files \
-            /bugreports /cache /d /dsp /firmware /persist \
-            /plat_file_contexts /plat_hwservice_contexts /plat_property_contexts \
-            /plat_seapp_contexts /plat_service_contexts /product /sdcard \
-            /vendor /vendor_file_contexts /vendor_hwservice_contexts \
-            /vendor_property_contexts /vendor_seapp_contexts /vendor_service_contexts \
-            /verity_key /vndservice_contexts %{nil}
-          EOF
-          cat rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec.bak >> rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec
-
-          # Fix include paths in BOTH specs to look at the local folder
-          sed -i 's|rpm/dhd/|dhd/|g' rpm/droid-hal-tissot/rpm/droid-hal-tissot.spec
-          sed -i 's|rpm/dhd/|../dhd/|g' rpm/droid-config-tissot/rpm/droid-config-tissot.spec
-
-          # Build from the unified rpm directory
+          # 2. Run the build within the expected container context
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
+            -e SFOS_RELEASE=$SFOS_RELEASE \
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
-              cd rpm
-              # We build in the directory where everything now lives side-by-side
-              ./dhd/helpers/build_packages.sh -b droid-hal-tissot
-              ./dhd/helpers/build_packages.sh -b droid-config-tissot
+              set -e
+              # Link the DHD directory to where the script expects it
+              ln -s /home/mersdk/share/rpm/dhd /home/mersdk/share/dhd
+              
+              # Build using the standard pathing provided by the SDK helpers
+              cd /home/mersdk/share/rpm/droid-hal-tissot
+              /home/mersdk/share/rpm/dhd/helpers/build_packages.sh -b .
+              
+              cd /home/mersdk/share/rpm/droid-config-tissot
+              /home/mersdk/share/rpm/dhd/helpers/build_packages.sh -b .
             "
-
-      # ==========================================
-      # STEP 3 & 4: (Keep previous packaging steps)
-      # ==========================================
