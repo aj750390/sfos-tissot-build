@@ -64,10 +64,6 @@ jobs:
           git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
           
-          # Restore symbolic link for script path integrity
-          sudo rm -f dhd
-          sudo ln -s $GITHUB_WORKSPACE/rpm/dhd $GITHUB_WORKSPACE/dhd
-          
           # Fix permissions for the container user
           sudo chmod -R 777 rpm
           
@@ -82,13 +78,16 @@ jobs:
               set -e
               git config --global --add safe.directory '*'
               
+              # Create the symlink INSIDE the container to satisfy path requirements
+              [ ! -d /home/mersdk/share/dhd ] && ln -s /home/mersdk/share/rpm/dhd /home/mersdk/share/dhd
+              
               # Initialize target in SDK
               TARGET_NAME=\${VENDOR}-\${DEVICE}-\${PORT_ARCH}
               if ! sdk-assistant list | grep -q \"\$TARGET_NAME\"; then
                 sdk-assistant -y create \$TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-\${SFOS_RELEASE}-Sailfish_SDK_Target-\${PORT_ARCH}.tar.7z
               fi
               
-              # Execute build scripts from their expected location
+              # Execute build scripts
               /home/mersdk/share/dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
               /home/mersdk/share/dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
             "
