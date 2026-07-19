@@ -64,6 +64,9 @@ jobs:
           git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
           
+          # Fix pathing: Copy DHD contents directly into rpm/ to satisfy mb2 lookups
+          cp -r rpm/dhd/* rpm/
+          
           # Fix permissions for the container user
           sudo chmod -R 777 rpm
           
@@ -77,9 +80,6 @@ jobs:
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
               set -e
               git config --global --add safe.directory '*'
-              
-              # Link DHD
-              [ ! -d /home/mersdk/share/dhd ] && ln -s /home/mersdk/share/rpm/dhd /home/mersdk/share/dhd
               
               # Initialize target in SDK
               TARGET_NAME=\${VENDOR}-\${DEVICE}-\${PORT_ARCH}
