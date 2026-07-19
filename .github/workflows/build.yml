@@ -224,7 +224,6 @@ jobs:
           git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
           git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
           
-          # ---> FIX: ADD DHD PROPERLY AS A GIT SUBMODULE <---
           echo "Registering dhd as a strict Git Submodule for mb2 compatibility..."
           cd hybris/droid-configs
           git config user.name "Builder"
@@ -234,7 +233,6 @@ jobs:
           git submodule add https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
           git commit -m "Initialize dhd submodule for mb2 snapshot" || true
           cd ../..
-          # --------------------------------------------------
 
           ln -snf rpm dhd
           for d in *; do
@@ -248,6 +246,7 @@ jobs:
           sudo chmod 777 $GITHUB_WORKSPACE
           sudo chmod -R 777 rpm dhd hybris droid-local-repo .mb2
 
+          # ---> FIX: ADDED SAFE.DIRECTORY INSIDE DOCKER <---
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
@@ -259,6 +258,7 @@ jobs:
             -e SFOS_RELEASE=$SFOS_RELEASE \
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
               set -e
+              git config --global --add safe.directory '*'
               export DHD_DIR=/home/mersdk/share/rpm
               export CONFIGS_DIR=/home/mersdk/share/hybris/droid-configs
               if ! sdk-assistant list 2>/dev/null | grep -q \"\${VENDOR}-\${DEVICE}-\${PORT_ARCH}\"; then
