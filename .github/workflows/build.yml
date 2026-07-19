@@ -222,17 +222,31 @@ jobs:
           git clone https://github.com/mer-hybris/droid-hal-device.git rpm/rpm/dhd
           rm -rf hybris/mer-kernel-check
           git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
-          git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
           
-          echo "Registering dhd as a strict Git Submodule for mb2 compatibility..."
+          # ---> FIX: FORCE FETCH AND FORCE TRACK THE DHD MACROS <---
+          git clone https://gitlab.com/aj750390/droid-config-tissot.git hybris/droid-configs
+          echo "Force-fetching DHD into droid-configs..."
           cd hybris/droid-configs
-          git config user.name "Builder"
-          git config user.email "builder@localhost"
-          rm -rf rpm/dhd
-          git rm -rf rpm/dhd 2>/dev/null || true
-          git submodule add https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
-          git commit -m "Initialize dhd submodule for mb2 snapshot" || true
+          
+          # Attempt native submodule initialization first (Standard SDK method)
+          git submodule update --init --recursive || true
+          
+          # If the file is still missing after init, forcefully inject and track it
+          if [ ! -f "rpm/dhd/droid-config-device.inc" ]; then
+            echo "Submodule missing. Manually injecting and force tracking..."
+            rm -rf rpm/dhd
+            git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
+            rm -rf rpm/dhd/.git
+            
+            git config user.name "Builder"
+            git config user.email "builder@localhost"
+            
+            # The -f flag is STRICTLY required to bypass hidden .gitignore rules!
+            git add -f rpm/dhd
+            git commit -m "Force track dhd to bypass gitignore and mb2 snapshot constraints" || true
+          fi
           cd ../..
+          # ---------------------------------------------------------
 
           ln -snf rpm dhd
           for d in *; do
@@ -246,7 +260,6 @@ jobs:
           sudo chmod 777 $GITHUB_WORKSPACE
           sudo chmod -R 777 rpm dhd hybris droid-local-repo .mb2
 
-          # ---> FIX: ADDED SAFE.DIRECTORY INSIDE DOCKER <---
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e PORT_ARCH=$SFOS_ARCH \
             -e DEVICE=$DEVICE \
