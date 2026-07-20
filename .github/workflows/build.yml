@@ -46,7 +46,26 @@ jobs:
           if [ ! -d ".repo" ]; then
             repo init -u https://github.com/mer-hybris/android.git -b hybris-16.0
           fi
-          repo sync -f -j$(nproc)
+          
+          # 1. Clone HAL repo early to extract device-specific manifests
+          mkdir -p rpm
+          if [ ! -d "rpm/droid-hal-tissot" ]; then
+            git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
+          fi
+          
+          # 2. Inject Tissot local manifests into the repo workspace
+          mkdir -p .repo/local_manifests
+          find rpm/droid-hal-tissot -name "*.xml" -type f -exec cp {} .repo/local_manifests/ \;
+          
+          # 3. Force sync to download the Tissot kernel, device tree, and vendor blobs
+          repo sync -c -f -j$(nproc) --force-sync
+          
+          # 4. Bulletproof the kernel checker script to prevent 'No such file' crashes
+          if [ ! -d "hybris/mer-kernel-check" ]; then
+            mkdir -p hybris
+            git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check || true
+          fi
+          chmod -R +x hybris/mer-kernel-check/ || true
           
           rm -rf external/libhybris
           git clone https://github.com/mer-hybris/libhybris.git external/libhybris
@@ -59,9 +78,11 @@ jobs:
         if: ${{ github.event.inputs.step_2_build == 'true' }}
         run: |
           mkdir -p rpm
-          git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
-          git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
-          git clone https://github.com/mer-hybris/droid-hal-device.git dhd
+          
+          # Ensure repositories exist in case Step 1 was skipped in a rerun
+          [ ! -d "rpm/droid-hal-tissot" ] && git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
+          [ ! -d "rpm/droid-config-tissot" ] && git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
+          [ ! -d "dhd" ] && git clone https://github.com/mer-hybris/droid-hal-device.git dhd
           
           # =================================================================
           # 1. Bypass the internal directory check crash
