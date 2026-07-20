@@ -79,9 +79,13 @@ jobs:
             -e VENDOR=$VENDOR \
             -e DEVICE=$DEVICE \
             -e PORT_ARCH=$SFOS_ARCH \
-            -e ANDROID_ROOT=/home/mersdk/share \
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
               set -e
+              
+              # Explicitly bind the directory and environment variable INSIDE the container
+              export ANDROID_ROOT=/home/mersdk/share
+              cd \$ANDROID_ROOT
+              
               git config --global --add safe.directory '*'
               
               # Initialize target in SDK
@@ -90,7 +94,7 @@ jobs:
                 sdk-assistant -y create \$TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-\${SFOS_RELEASE}-Sailfish_SDK_Target-\${PORT_ARCH}.tar.7z
               fi
               
-              # Execute build scripts using the root dhd directory
+              # Execute build scripts
               /home/mersdk/share/dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
               /home/mersdk/share/dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
             "
