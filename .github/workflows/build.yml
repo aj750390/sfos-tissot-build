@@ -67,8 +67,9 @@ jobs:
           git clone https://github.com/mer-hybris/droid-hal-device.git dhd
           
           # Forcefully bypass the strict path-matching safeguards in the build script
-          sed -i '2i export ANDROID_ROOT=/home/mersdk/share' dhd/helpers/build_packages.sh
-          sed -i 's|if \[ "$(pwd)" != "$ANDROID_ROOT" \]; then|if false; then|g' dhd/helpers/build_packages.sh
+          # Replacing both backticks and $() syntax to ensure the check evaluates to true
+          sed -i 's/`pwd`/$ANDROID_ROOT/g' dhd/helpers/build_packages.sh
+          sed -i 's/$(pwd)/$ANDROID_ROOT/g' dhd/helpers/build_packages.sh
           
           # Manually copy dhd directly into the package rpm folders to satisfy mb2 chroot limits
           cp -r dhd rpm/droid-hal-tissot/rpm/
