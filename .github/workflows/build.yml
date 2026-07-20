@@ -63,46 +63,50 @@ jobs:
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
           git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
           
-          # Clone dhd to the workspace root where the build script natively runs from
+          # Clone dhd to the workspace root
           git clone https://github.com/mer-hybris/droid-hal-device.git dhd
           
-          # Forcefully bypass the strict path-matching safeguards in the build script
-          # Replacing both backticks and $() syntax to ensure the check evaluates to true
-          sed -i 's/`pwd`/$ANDROID_ROOT/g' dhd/helpers/build_packages.sh
-          sed -i 's/$(pwd)/$ANDROID_ROOT/g' dhd/helpers/build_packages.sh
-          
-          # Manually copy dhd directly into the package rpm folders to satisfy mb2 chroot limits
+          # Copy dhd directly into the package rpm folders
           cp -r dhd rpm/droid-hal-tissot/rpm/
           cp -r dhd rpm/droid-config-tissot/rpm/
           
           # Fix permissions for the container user
           sudo chmod -R 777 rpm dhd
           
-          # Run build in Docker
+          # =================================================================
+          # Generate a dedicated script to run INSIDE Docker.
+          # The 'EOF' strictly prevents the host runner from altering variables.
+          # =================================================================
+          cat << 'EOF' > run_build.sh
+          #!/bin/bash
+          set -e
+          
+          # Dynamically set ANDROID_ROOT exactly to the container's working directory
+          export ANDROID_ROOT=$(pwd)
+          echo "Executing safely from: $ANDROID_ROOT"
+          
+          git config --global --add safe.directory '*'
+          
+          # Initialize target in SDK
+          TARGET_NAME=${VENDOR}-${DEVICE}-${PORT_ARCH}
+          if ! sdk-assistant list | grep -q "$TARGET_NAME"; then
+            sdk-assistant -y create $TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-${SFOS_RELEASE}-Sailfish_SDK_Target-${PORT_ARCH}.tar.7z
+          fi
+          
+          # Execute build scripts using relative paths
+          ./dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
+          ./dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
+          EOF
+          
+          chmod +x run_build.sh
+          
+          # Run build in Docker by executing the clean script
           docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e SFOS_RELEASE=$SFOS_RELEASE \
             -e VENDOR=$VENDOR \
             -e DEVICE=$DEVICE \
             -e PORT_ARCH=$SFOS_ARCH \
-            -e ANDROID_ROOT=/home/mersdk/share \
-            coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
-              set -e
-              
-              export ANDROID_ROOT=/home/mersdk/share
-              cd \$ANDROID_ROOT
-              
-              git config --global --add safe.directory '*'
-              
-              # Initialize target in SDK
-              TARGET_NAME=\${VENDOR}-\${DEVICE}-\${PORT_ARCH}
-              if ! sdk-assistant list | grep -q \"\$TARGET_NAME\"; then
-                sdk-assistant -y create \$TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-\${SFOS_RELEASE}-Sailfish_SDK_Target-\${PORT_ARCH}.tar.7z
-              fi
-              
-              # Execute build scripts
-              /home/mersdk/share/dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
-              /home/mersdk/share/dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
-            "
+            coderus/sailfishos-platform-sdk:$SFOS_RELEASE /home/mersdk/share/run_build.sh
 
       # ==========================================
       # STEP 3: ARTIFACT UPLOAD
