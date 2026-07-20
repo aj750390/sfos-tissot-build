@@ -44,6 +44,8 @@ jobs:
       - name: Prepare & Sync Source Code
         if: ${{ github.event.inputs.step_1_download == 'true' }}
         run: |
+          sudo chown -R $USER:$USER .
+          
           git config --global user.name "Builder"
           git config --global user.email "builder@localhost"
           git config --global --add safe.directory '*'
@@ -74,6 +76,11 @@ jobs:
       - name: Build Android & Droid HAL
         if: ${{ github.event.inputs.step_2_build == 'true' }}
         run: |
+          # =================================================================
+          # Reclaim ownership from previous root-level Docker runs
+          sudo chown -R $USER:$USER .
+          # =================================================================
+          
           mkdir -p rpm
           
           # 1. Ensure absolute dependencies exist EVEN IF Step 1 was skipped
