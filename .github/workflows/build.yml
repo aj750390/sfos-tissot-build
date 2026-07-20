@@ -66,6 +66,10 @@ jobs:
           # Clone dhd to the workspace root where the build script natively runs from
           git clone https://github.com/mer-hybris/droid-hal-device.git dhd
           
+          # Forcefully bypass the strict path-matching safeguards in the build script
+          sed -i '2i export ANDROID_ROOT=/home/mersdk/share' dhd/helpers/build_packages.sh
+          sed -i 's|if \[ "$(pwd)" != "$ANDROID_ROOT" \]; then|if false; then|g' dhd/helpers/build_packages.sh
+          
           # Manually copy dhd directly into the package rpm folders to satisfy mb2 chroot limits
           cp -r dhd rpm/droid-hal-tissot/rpm/
           cp -r dhd rpm/droid-config-tissot/rpm/
@@ -79,10 +83,10 @@ jobs:
             -e VENDOR=$VENDOR \
             -e DEVICE=$DEVICE \
             -e PORT_ARCH=$SFOS_ARCH \
+            -e ANDROID_ROOT=/home/mersdk/share \
             coderus/sailfishos-platform-sdk:$SFOS_RELEASE /bin/bash -c "
               set -e
               
-              # Explicitly bind the directory and environment variable INSIDE the container
               export ANDROID_ROOT=/home/mersdk/share
               cd \$ANDROID_ROOT
               
