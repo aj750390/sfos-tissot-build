@@ -64,17 +64,20 @@ jobs:
           git clone https://github.com/mer-hybris/droid-hal-device.git dhd
           
           # =================================================================
-          # GUARANTEED BYPASS: 
-          # 1. Rewrite the first line to hard-lock the variable to the current shell's path
+          # 1. Bypass the internal directory check crash
           sed -i '1s|^.*|#!/bin/bash\nexport ANDROID_ROOT=$(pwd)|' dhd/helpers/build_packages.sh
-          
-          # 2. Find the exact error message and convert the 'exit 1' after it into an echo
           sed -i '/launch this script/ { N; s/exit 1/echo "Bypassed directory check exit"/ }' dhd/helpers/build_packages.sh
           # =================================================================
           
-          # Copy dhd directly into the package rpm folders
+          # =================================================================
+          # 2. Satisfy the util.sh relative path requirement
+          cp -r dhd rpm/dhd
+          # =================================================================
+          
+          # Copy dhd into the individual package rpm folders just in case
           cp -r dhd rpm/droid-hal-tissot/rpm/
           cp -r dhd rpm/droid-config-tissot/rpm/
+          
           sudo chmod -R 777 rpm dhd
           
           # Generate a dedicated script to run cleanly inside Docker
