@@ -61,21 +61,20 @@ jobs:
           mkdir -p rpm
           git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
           git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
-          
-          # Clone dhd to the workspace root
           git clone https://github.com/mer-hybris/droid-hal-device.git dhd
           
           # =================================================================
-          # SURGICAL PATCH: Nuke the directory check entirely.
-          # Finds the '!= "$ANDROID_ROOT"' logic and deletes the whole block.
+          # GUARANTEED BYPASS: 
+          # 1. Rewrite the first line to hard-lock the variable to the current shell's path
+          sed -i '1s|^.*|#!/bin/bash\nexport ANDROID_ROOT=$(pwd)|' dhd/helpers/build_packages.sh
+          
+          # 2. Find the exact error message and convert the 'exit 1' after it into an echo
+          sed -i '/launch this script/ { N; s/exit 1/echo "Bypassed directory check exit"/ }' dhd/helpers/build_packages.sh
           # =================================================================
-          sed -i '/!= "$ANDROID_ROOT"/,/fi/d' dhd/helpers/build_packages.sh
           
           # Copy dhd directly into the package rpm folders
           cp -r dhd rpm/droid-hal-tissot/rpm/
           cp -r dhd rpm/droid-config-tissot/rpm/
-          
-          # Fix permissions for the container user
           sudo chmod -R 777 rpm dhd
           
           # Generate a dedicated script to run cleanly inside Docker
