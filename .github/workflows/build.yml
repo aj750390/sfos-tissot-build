@@ -27,7 +27,6 @@ jobs:
     steps:
       # ==========================================
       # CONDITIONAL CLEANUP
-      # Only wipe if we are doing a full repo sync
       # ==========================================
       - name: Clean Workspace (Conditional)
         if: ${{ github.event.inputs.step_1_download == 'true' }}
@@ -54,7 +53,7 @@ jobs:
             repo init -u https://github.com/mer-hybris/android.git -b hybris-16.0
           fi
           
-          # Extract Tissot local manifests early
+          # Extract Tissot local manifests
           mkdir -p rpm
           if [ ! -d "rpm/droid-hal-tissot" ]; then
             git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
@@ -63,7 +62,7 @@ jobs:
           mkdir -p .repo/local_manifests
           find rpm/droid-hal-tissot -name "*.xml" -type f -exec cp {} .repo/local_manifests/ \;
           
-          # Force sync to get the device tree
+          # Force sync to get the device tree and kernel
           repo sync -c -f -j$(nproc) --force-sync
           
           rm -rf external/libhybris
@@ -76,37 +75,32 @@ jobs:
       - name: Build Android & Droid HAL
         if: ${{ github.event.inputs.step_2_build == 'true' }}
         run: |
-          # =================================================================
           # Reclaim ownership from previous root-level Docker runs
           sudo chown -R $USER:$USER .
-          # =================================================================
+          
+          # STRICT VALIDATION: Check if Android Source exists
+          if [ ! -f "build/envsetup.sh" ]; then
+            echo "::error::The Android source tree is missing! You MUST run this workflow with Step 1 enabled to sync the code."
+            exit 1
+          fi
           
           mkdir -p rpm
           
-          # 1. Ensure absolute dependencies exist EVEN IF Step 1 was skipped
+          # Clone target packages and the DHD helper directly to the correct relative path
           [ ! -d "rpm/droid-hal-tissot" ] && git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
           [ ! -d "rpm/droid-config-tissot" ] && git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
-          [ ! -d "dhd" ] && git clone https://github.com/mer-hybris/droid-hal-device.git dhd
+          [ ! -d "rpm/dhd" ] && git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
           
-          # Explicitly clone the kernel checker so it never fails on Step 2 runs
+          # Ensure kernel checker is present
           if [ ! -d "hybris/mer-kernel-check" ]; then
             mkdir -p hybris
             git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
           fi
           chmod -R +x hybris/mer-kernel-check/ || true
           
-          # 2. Bypass the internal directory check crash
-          sed -i '1s|^.*|#!/bin/bash\nexport ANDROID_ROOT=$(pwd)|' dhd/helpers/build_packages.sh
-          sed -i '/launch this script/ { N; s/exit 1/echo "Bypassed directory check exit"/ }' dhd/helpers/build_packages.sh
+          sudo chmod -R 777 rpm
           
-          # 3. Satisfy the util.sh relative path requirement
-          cp -r dhd rpm/dhd
-          cp -r dhd rpm/droid-hal-tissot/rpm/
-          cp -r dhd rpm/droid-config-tissot/rpm/
-          
-          sudo chmod -R 777 rpm dhd
-          
-          # 4. Generate build script
+          # Generate build script (No sed bypasses. Running it purely as intended).
           cat << 'EOF' > run_build.sh
           #!/bin/bash
           set -e
@@ -119,8 +113,8 @@ jobs:
             sdk-assistant -y create $TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-${SFOS_RELEASE}-Sailfish_SDK_Target-${PORT_ARCH}.tar.7z
           fi
           
-          ./dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
-          ./dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
+          ./rpm/dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
+          ./rpm/dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
           EOF
           
           chmod +x run_build.sh
