@@ -93,8 +93,7 @@ jobs:
           [ ! -d "rpm/droid-hal-tissot" ] && git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
           [ ! -d "rpm/droid-config-tissot" ] && git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
           
-          # FIX: Populate the internal 'dhd' directories using a wildcard
-          # This forces the contents to overwrite the empty submodule directories
+          # Populate the internal 'dhd' directories using a wildcard
           mkdir -p rpm/droid-hal-tissot/rpm/dhd
           cp -r dhd/* rpm/droid-hal-tissot/rpm/dhd/
           
@@ -106,9 +105,9 @@ jobs:
             mkdir -p hybris
             git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
           fi
-          chmod -R +x hybris/mer-kernel-check/ || true
           
-          sudo chmod -R 777 rpm dhd
+          # FIX: Grant unrestricted access to the entire workspace for the Docker container
+          sudo chmod -R 777 .
           
           # Generate build script
           cat << 'EOF' > run_build.sh
