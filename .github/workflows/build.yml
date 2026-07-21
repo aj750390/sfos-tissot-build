@@ -1,12 +1,15 @@
 name: SFOS tissot build
 
-# Runs on a SELF-HOSTED runner only. GitHub-hosted runners (2-core, ~14GB
-# disk free) cannot fit an Android + hybris build. Register a self-hosted
-# runner on your build host with the label below.
+# Runs on a SELF-HOSTED runner only. GitHub-hosted runners cannot fit an
+# Android + hybris build (disk/RAM/time). Register a self-hosted runner
+# on your build host, tagged "sfos-hadk".
 #
-# Settings > Actions > Runners > New self-hosted runner, then tag it
-# with the label "sfos-hadk" (edit the runner's config.sh --labels flag,
-# or add it after registration in the runner settings).
+# IMPORTANT: Platform SDK, the HABUILD chroot, and the full Android source
+# tree live at FIXED PATHS ON THE RUNNER HOST, set up once by hand and
+# reused across every run. They are intentionally outside
+# ${{ github.workspace }}, which gets wiped/re-checked-out on every job.
+# Only this repo's own scripts, and final build outputs, pass through the
+# workspace.
 
 on:
   workflow_dispatch: {}
@@ -18,23 +21,28 @@ env:
   VENDOR: xiaomi
   PORT_ARCH: armv7hl
   SFOS_VERSION: "4.6.0.11"
-  HABUILD_SDK: ${{ github.workspace }}/habuild-sdk
-  ANDROID_ROOT: ${{ github.workspace }}/hadk
+  # Persistent host paths - NOT under github.workspace. Adjust to match
+  # wherever you actually installed these on the runner host.
+  PLATFORM_SDK_ROOT: /srv/hadk/sdk
+  ANDROID_ROOT: /srv/hadk/hadk
 
 jobs:
   sync_source:
     runs-on: [self-hosted, sfos-hadk]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up HABUILD SDK link
+      - name: Verify Platform SDK / HABUILD chroot present
         run: bash scripts/setup-habuild.sh
       - name: repo init/sync (halium-9.0 + tissot local manifest)
         run: bash scripts/sync-source.sh
-      - name: Upload manifest for later jobs
-        uses: actions/upload-artifact@v4
+      - name: Copy manifest into workspace for artifact upload
+        run: |
+          mkdir -p artifacts
+          cp "$ANDROID_ROOT/.repo/manifest.xml" artifacts/manifest.xml
+      - uses: actions/upload-artifact@v4
         with:
           name: manifest
-          path: hadk/.repo/manifest.xml
+          path: artifacts/manifest.xml
           retention-days: 1
 
   build_hybris_hal:
@@ -44,13 +52,17 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build hybris-boot / hybris-recovery
         run: bash scripts/build-hybris-hal.sh
-      - name: Upload boot images
-        uses: actions/upload-artifact@v4
+      - name: Copy images into workspace for artifact upload
+        run: |
+          mkdir -p artifacts
+          cp "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img" artifacts/
+          cp "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-recovery.img" artifacts/
+      - uses: actions/upload-artifact@v4
         with:
           name: hybris-boot-images
           path: |
-            hadk/out/target/product/${{ env.DEVICE }}/hybris-boot.img
-            hadk/out/target/product/${{ env.DEVICE }}/hybris-recovery.img
+            artifacts/hybris-boot.img
+            artifacts/hybris-recovery.img
           retention-days: 7
 
   build_rootfs:
@@ -60,11 +72,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build droid-hal / droid-config RPMs
         run: bash scripts/build-droid-hal.sh
-      - name: Upload RPMs
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: droid-hal-rpms
-          path: rpms/*.rpm
+          path: artifacts/rpms/*.rpm
           retention-days: 7
 
   package_image:
@@ -74,9 +85,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build flashable image with mic
         run: bash scripts/build-image.sh
-      - name: Upload final image
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: sfos-tissot-image
-          path: images/*
+          path: artifacts/images/*
           retention-days: 14
