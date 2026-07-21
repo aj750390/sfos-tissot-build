@@ -4,31 +4,21 @@ on:
   workflow_dispatch:
     inputs:
       step_1_download:
-        description: 'Step 1: Sync Missing Device Code (Keeps existing data)'
-        required: true
+        description: 'Step 1: Download/Sync Source Code'
         type: boolean
         default: true
       step_2_build:
-        description: 'Step 2: Build Android and Droid HAL'
-        required: true
+        description: 'Step 2: Compile HAL & Package RPMs'
         type: boolean
         default: true
-
-env:
-  SFOS_RELEASE: "4.5.0.16"
-  SFOS_ARCH: "aarch64"
-  VENDOR: "xiaomi"
-  DEVICE: "tissot"
 
 jobs:
   compile:
     runs-on: self-hosted
-
+    
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          clean: false
+      - name: Checkout builder repository
+        uses: actions/checkout@v3
 
       # ==========================================
       # STEP 1: SMART SYNC (NO WIPE)
@@ -49,12 +39,16 @@ jobs:
           echo "Clearing out any broken vendor repository caches..."
           rm -rf vendor/xiaomi .repo/projects/vendor/xiaomi.git .repo/project-objects/TheMuppets/proprietary_vendor_xiaomi.git .repo/project-objects/the-muppets/proprietary_vendor_xiaomi.git
           
+          echo "Clearing old auto-generated manifests to prevent duplicate path errors..."
+          rm -rf .repo/local_manifests/*
           mkdir -p .repo/local_manifests
+          
           cat << 'EOF' > .repo/local_manifests/tissot.xml
           <?xml version="1.0" encoding="UTF-8"?>
           <manifest>
             <remote name="gitlab_vendor" fetch="https://gitlab.com" />
             <project name="LineageOS/android_device_xiaomi_tissot" path="device/xiaomi/tissot" remote="github" revision="lineage-16.0" />
+            <project name="LineageOS/android_device_xiaomi_msm8953-common" path="device/xiaomi/msm8953-common" remote="github" revision="lineage-16.0" />
             <project name="LineageOS/android_kernel_xiaomi_msm8953" path="kernel/xiaomi/msm8953" remote="github" revision="lineage-16.0" />
             <project name="the-muppets/proprietary_vendor_xiaomi" path="vendor/xiaomi" remote="gitlab_vendor" revision="lineage-16.0" />
           </manifest>
@@ -67,82 +61,27 @@ jobs:
           cd external/libhybris && git submodule update --init --depth 1 && cd ../..
 
       # ==========================================
-      # STEP 2: BUILD HAL
+      # STEP 2: BUILD ANDROID HAL & RPMs
       # ==========================================
-      - name: Build Android & Droid HAL
+      - name: Build Android HAL (Native Host)
         if: ${{ github.event.inputs.step_2_build == 'true' }}
         run: |
-          sudo chown -R $USER:$USER .
-          
-          if [ ! -f "build/envsetup.sh" ]; then
-            echo "::error::The Android source tree is missing!"
-            exit 1
-          fi
-          
-          mkdir -p rpm
-          
-          [ ! -d "dhd" ] && git clone https://github.com/mer-hybris/droid-hal-device.git dhd
-          
-          [ ! -d "rpm/droid-hal-tissot" ] && git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
-          [ ! -d "rpm/droid-config-tissot" ] && git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
-          
-          mkdir -p rpm/droid-hal-tissot/rpm/dhd
-          cp -r dhd/* rpm/droid-hal-tissot/rpm/dhd/
-          
-          mkdir -p rpm/droid-config-tissot/rpm/dhd
-          cp -r dhd/* rpm/droid-config-tissot/rpm/dhd/
-          
-          if [ ! -d "hybris/mer-kernel-check" ]; then
-            mkdir -p hybris
-            git clone https://github.com/mer-hybris/mer-kernel-check.git hybris/mer-kernel-check
-          fi
-          
-          sudo chmod -R 777 .
+          echo "=== Compiling Android HAL natively on host ==="
+          source build/envsetup.sh
+          breakfast tissot
+          make -j$(nproc) halium-boot
+          make -j$(nproc) systemimage
 
-          # ---------------------------------------------------------
-          # PHASE 1: COMPILE ANDROID HAL (Runs on your native PC environment)
-          # ---------------------------------------------------------
-          echo "=== Compiling Android HAL ==="
-          bash -c "source build/envsetup.sh && breakfast $DEVICE && make -j$(nproc) hybris-hal"
-          
-          # ---------------------------------------------------------
-          # PHASE 2: PACKAGE DROID HAL (Runs in Docker)
-          # ---------------------------------------------------------
-          cat << 'EOF' > run_build_rpm.sh
-          #!/bin/bash
-          set -e
-          
-          export ANDROID_ROOT=$(pwd)
-          git config --global --add safe.directory '*'
-          
-          echo "=== Setting up Sailfish SDK Target ==="
-          TARGET_NAME=${VENDOR}-${DEVICE}-${PORT_ARCH}
-          if ! sdk-assistant list | grep -q "$TARGET_NAME"; then
-            sdk-assistant -y create $TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-${SFOS_RELEASE}-Sailfish_SDK_Target-${PORT_ARCH}.tar.7z
-          fi
-          
-          echo "=== Packaging Droid HAL ==="
-          ./dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
-          ./dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
-          EOF
-          
-          chmod +x run_build_rpm.sh
-          
-          docker run --rm --privileged --network host -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
-            -e SFOS_RELEASE=$SFOS_RELEASE \
-            -e VENDOR=$VENDOR \
-            -e DEVICE=$DEVICE \
-            -e PORT_ARCH=$SFOS_ARCH \
-            coderus/sailfishos-platform-sdk:$SFOS_RELEASE /home/mersdk/share/run_build_rpm.sh
-
-      # ==========================================
-      # STEP 3: ARTIFACT UPLOAD
-      # ==========================================
-      - name: Upload Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: sfos-tissot-build-files
-          path: |
-            rpm/droid-hal-tissot/rpm/*.rpm
-            rpm/droid-config-tissot/rpm/*.rpm
-          retention-days: 90
+      - name: Package Droid HAL (Sailfish SDK Docker)
+        if: ${{ github.event.inputs.step_2_build == 'true' }}
+        run: |
+          echo "=== Packaging RPMs inside Sailfish SDK ==="
+          docker run --rm --privileged --network host \
+            -v ${{ github.workspace }}:/share \
+            coderus/sailfishos-platform-sdk \
+            /bin/bash -c "
+              cd /share
+              source build/envsetup.sh
+              breakfast tissot
+              rpm/dhd/helpers/build_packages.sh --droid-hal
+            "
