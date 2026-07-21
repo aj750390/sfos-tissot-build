@@ -56,10 +56,10 @@ jobs:
           cat << 'EOF' > .repo/local_manifests/tissot.xml
           <?xml version="1.0" encoding="UTF-8"?>
           <manifest>
-            <remote name="gitlab" fetch="https://gitlab.com" />
+            <remote name="gitlab_vendor" fetch="https://gitlab.com" />
             <project name="LineageOS/android_device_xiaomi_tissot" path="device/xiaomi/tissot" remote="github" revision="lineage-16.0" />
             <project name="LineageOS/android_kernel_xiaomi_msm8953" path="kernel/xiaomi/msm8953" remote="github" revision="lineage-16.0" />
-            <project name="the-muppets/proprietary_vendor_xiaomi" path="vendor/xiaomi" remote="gitlab" revision="lineage-16.0" />
+            <project name="the-muppets/proprietary_vendor_xiaomi" path="vendor/xiaomi" remote="gitlab_vendor" revision="lineage-16.0" />
           </manifest>
           EOF
           
