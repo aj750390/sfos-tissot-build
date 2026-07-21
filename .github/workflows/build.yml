@@ -86,10 +86,20 @@ jobs:
           
           mkdir -p rpm
           
-          # Clone target packages and the DHD helper directly to the correct relative path
+          # Clone DHD to root for the helper scripts
+          [ ! -d "dhd" ] && git clone https://github.com/mer-hybris/droid-hal-device.git dhd
+          
+          # Clone target packages
           [ ! -d "rpm/droid-hal-tissot" ] && git clone https://gitlab.com/aj750390/droid-hal-tissot.git rpm/droid-hal-tissot
           [ ! -d "rpm/droid-config-tissot" ] && git clone https://gitlab.com/aj750390/droid-config-tissot.git rpm/droid-config-tissot
-          [ ! -d "rpm/dhd" ] && git clone https://github.com/mer-hybris/droid-hal-device.git rpm/dhd
+          
+          # FIX: Populate the internal 'dhd' directories using a wildcard
+          # This forces the contents to overwrite the empty submodule directories
+          mkdir -p rpm/droid-hal-tissot/rpm/dhd
+          cp -r dhd/* rpm/droid-hal-tissot/rpm/dhd/
+          
+          mkdir -p rpm/droid-config-tissot/rpm/dhd
+          cp -r dhd/* rpm/droid-config-tissot/rpm/dhd/
           
           # Ensure kernel checker is present
           if [ ! -d "hybris/mer-kernel-check" ]; then
@@ -98,9 +108,9 @@ jobs:
           fi
           chmod -R +x hybris/mer-kernel-check/ || true
           
-          sudo chmod -R 777 rpm
+          sudo chmod -R 777 rpm dhd
           
-          # Generate build script (No sed bypasses. Running it purely as intended).
+          # Generate build script
           cat << 'EOF' > run_build.sh
           #!/bin/bash
           set -e
@@ -113,8 +123,8 @@ jobs:
             sdk-assistant -y create $TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-${SFOS_RELEASE}-Sailfish_SDK_Target-${PORT_ARCH}.tar.7z
           fi
           
-          ./rpm/dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
-          ./rpm/dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
+          ./dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
+          ./dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
           EOF
           
           chmod +x run_build.sh
