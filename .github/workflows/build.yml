@@ -1,87 +1,82 @@
-name: Sailfish OS Tissot Build
+name: SFOS tissot build
+
+# Runs on a SELF-HOSTED runner only. GitHub-hosted runners (2-core, ~14GB
+# disk free) cannot fit an Android + hybris build. Register a self-hosted
+# runner on your build host with the label below.
+#
+# Settings > Actions > Runners > New self-hosted runner, then tag it
+# with the label "sfos-hadk" (edit the runner's config.sh --labels flag,
+# or add it after registration in the runner settings).
 
 on:
-  workflow_dispatch:
-    inputs:
-      step_1_download:
-        description: 'Step 1: Download/Sync Source Code'
-        type: boolean
-        default: true
-      step_2_build:
-        description: 'Step 2: Compile HAL & Package RPMs'
-        type: boolean
-        default: true
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 2 * * 0"   # optional: weekly rebuild, remove if unwanted
+
+env:
+  DEVICE: tissot
+  VENDOR: xiaomi
+  PORT_ARCH: armv7hl
+  SFOS_VERSION: "4.6.0.11"
+  HABUILD_SDK: ${{ github.workspace }}/habuild-sdk
+  ANDROID_ROOT: ${{ github.workspace }}/hadk
 
 jobs:
-  compile:
-    runs-on: self-hosted
-    
+  sync_source:
+    runs-on: [self-hosted, sfos-hadk]
     steps:
-      - name: Checkout builder repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - name: Set up HABUILD SDK link
+        run: bash scripts/setup-habuild.sh
+      - name: repo init/sync (halium-9.0 + tissot local manifest)
+        run: bash scripts/sync-source.sh
+      - name: Upload manifest for later jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest
+          path: hadk/.repo/manifest.xml
+          retention-days: 1
 
-      # ==========================================
-      # STEP 1: SMART SYNC (NO WIPE)
-      # ==========================================
-      - name: Prepare & Sync Source Code
-        if: ${{ github.event.inputs.step_1_download == 'true' }}
-        run: |
-          sudo chown -R $USER:$USER .
-          
-          git config --global user.name "Builder"
-          git config --global user.email "builder@localhost"
-          git config --global --add safe.directory '*'
-          
-          if [ ! -d ".repo" ]; then
-            repo init -u https://github.com/mer-hybris/android.git -b hybris-16.0
-          fi
-          
-          echo "Clearing out any broken vendor repository caches..."
-          rm -rf vendor/xiaomi .repo/projects/vendor/xiaomi.git .repo/project-objects/TheMuppets/proprietary_vendor_xiaomi.git .repo/project-objects/the-muppets/proprietary_vendor_xiaomi.git
-          
-          echo "Clearing old auto-generated manifests to prevent duplicate path errors..."
-          rm -rf .repo/local_manifests/*
-          mkdir -p .repo/local_manifests
-          
-          cat << 'EOF' > .repo/local_manifests/tissot.xml
-          <?xml version="1.0" encoding="UTF-8"?>
-          <manifest>
-            <remote name="gitlab_vendor" fetch="https://gitlab.com" />
-            <project name="LineageOS/android_device_xiaomi_tissot" path="device/xiaomi/tissot" remote="github" revision="lineage-16.0" />
-            <project name="LineageOS/android_device_xiaomi_msm8953-common" path="device/xiaomi/msm8953-common" remote="github" revision="lineage-16.0" />
-            <project name="LineageOS/android_kernel_xiaomi_msm8953" path="kernel/xiaomi/msm8953" remote="github" revision="lineage-16.0" />
-            <project name="the-muppets/proprietary_vendor_xiaomi" path="vendor/xiaomi" remote="gitlab_vendor" revision="lineage-16.0" />
-          </manifest>
-          EOF
-          
-          repo sync -c -f -j$(nproc) --force-sync
-          
-          rm -rf external/libhybris
-          git clone https://github.com/mer-hybris/libhybris.git external/libhybris
-          cd external/libhybris && git submodule update --init --depth 1 && cd ../..
+  build_hybris_hal:
+    needs: sync_source
+    runs-on: [self-hosted, sfos-hadk]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build hybris-boot / hybris-recovery
+        run: bash scripts/build-hybris-hal.sh
+      - name: Upload boot images
+        uses: actions/upload-artifact@v4
+        with:
+          name: hybris-boot-images
+          path: |
+            hadk/out/target/product/${{ env.DEVICE }}/hybris-boot.img
+            hadk/out/target/product/${{ env.DEVICE }}/hybris-recovery.img
+          retention-days: 7
 
-      # ==========================================
-      # STEP 2: BUILD ANDROID HAL & RPMs
-      # ==========================================
-      - name: Build Android HAL (Native Host)
-        if: ${{ github.event.inputs.step_2_build == 'true' }}
-        run: |
-          echo "=== Compiling Android HAL natively on host ==="
-          source build/envsetup.sh
-          breakfast tissot
-          make -j$(nproc) halium-boot
-          make -j$(nproc) systemimage
+  build_rootfs:
+    needs: build_hybris_hal
+    runs-on: [self-hosted, sfos-hadk]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build droid-hal / droid-config RPMs
+        run: bash scripts/build-droid-hal.sh
+      - name: Upload RPMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: droid-hal-rpms
+          path: rpms/*.rpm
+          retention-days: 7
 
-      - name: Package Droid HAL (Sailfish SDK Docker)
-        if: ${{ github.event.inputs.step_2_build == 'true' }}
-        run: |
-          echo "=== Packaging RPMs inside Sailfish SDK ==="
-          docker run --rm --privileged --network host \
-            -v ${{ github.workspace }}:/share \
-            coderus/sailfishos-platform-sdk \
-            /bin/bash -c "
-              cd /share
-              source build/envsetup.sh
-              breakfast tissot
-              rpm/dhd/helpers/build_packages.sh --droid-hal
-            "
+  package_image:
+    needs: build_rootfs
+    runs-on: [self-hosted, sfos-hadk]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build flashable image with mic
+        run: bash scripts/build-image.sh
+      - name: Upload final image
+        uses: actions/upload-artifact@v4
+        with:
+          name: sfos-tissot-image
+          path: images/*
+          retention-days: 14
