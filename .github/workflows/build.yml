@@ -46,9 +46,6 @@ jobs:
             repo init -u https://github.com/mer-hybris/android.git -b hybris-16.0
           fi
           
-          # ---------------------------------------------------------
-          # NUKE BROKEN CACHE & INJECT NEW GITLAB MANIFEST
-          # ---------------------------------------------------------
           echo "Clearing out any broken vendor repository caches..."
           rm -rf vendor/xiaomi .repo/projects/vendor/xiaomi.git .repo/project-objects/TheMuppets/proprietary_vendor_xiaomi.git .repo/project-objects/the-muppets/proprietary_vendor_xiaomi.git
           
@@ -63,7 +60,6 @@ jobs:
           </manifest>
           EOF
           
-          # Force sync to grab the repos from the new sources
           repo sync -c -f -j$(nproc) --force-sync
           
           rm -rf external/libhybris
@@ -102,12 +98,19 @@ jobs:
           fi
           
           sudo chmod -R 777 .
+
+          # ---------------------------------------------------------
+          # PHASE 1: COMPILE ANDROID HAL (Runs on your native PC environment)
+          # ---------------------------------------------------------
+          echo "=== Compiling Android HAL ==="
+          bash -c "source build/envsetup.sh && breakfast $DEVICE && make -j$(nproc) hybris-hal"
           
-          cat << 'EOF' > run_build.sh
+          # ---------------------------------------------------------
+          # PHASE 2: PACKAGE DROID HAL (Runs in Docker)
+          # ---------------------------------------------------------
+          cat << 'EOF' > run_build_rpm.sh
           #!/bin/bash
-          
-          # Enable verbose logging to see exactly where it fails
-          set -x
+          set -e
           
           export ANDROID_ROOT=$(pwd)
           git config --global --add safe.directory '*'
@@ -115,31 +118,22 @@ jobs:
           echo "=== Setting up Sailfish SDK Target ==="
           TARGET_NAME=${VENDOR}-${DEVICE}-${PORT_ARCH}
           if ! sdk-assistant list | grep -q "$TARGET_NAME"; then
-            sdk-assistant -y create $TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-${SFOS_RELEASE}-Sailfish_SDK_Target-${PORT_ARCH}.tar.7z || exit 1
+            sdk-assistant -y create $TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-${SFOS_RELEASE}-Sailfish_SDK_Target-${PORT_ARCH}.tar.7z
           fi
           
-          echo "=== Compiling Android HAL ==="
-          # Sourcing envsetup safely without set -e
-          source build/envsetup.sh
-          
-          # Explicit lunch target for automated builds
-          lunch lineage_${DEVICE}-userdebug || exit 1
-          
-          make -j$(nproc) hybris-hal || exit 1
-          
           echo "=== Packaging Droid HAL ==="
-          ./dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot || exit 1
-          ./dhd/helpers/build_packages.sh -b rpm/droid-config-tissot || exit 1
+          ./dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
+          ./dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
           EOF
           
-          chmod +x run_build.sh
+          chmod +x run_build_rpm.sh
           
           docker run --rm --privileged --network host -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e SFOS_RELEASE=$SFOS_RELEASE \
             -e VENDOR=$VENDOR \
             -e DEVICE=$DEVICE \
             -e PORT_ARCH=$SFOS_ARCH \
-            coderus/sailfishos-platform-sdk:$SFOS_RELEASE /home/mersdk/share/run_build.sh
+            coderus/sailfishos-platform-sdk:$SFOS_RELEASE /home/mersdk/share/run_build_rpm.sh
 
       # ==========================================
       # STEP 3: ARTIFACT UPLOAD
