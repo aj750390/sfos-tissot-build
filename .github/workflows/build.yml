@@ -128,7 +128,7 @@ jobs:
           
           chmod +x run_build.sh
           
-          docker run --rm --privileged -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
+          docker run --rm --privileged --network host -v $GITHUB_WORKSPACE:/home/mersdk/share -w /home/mersdk/share \
             -e SFOS_RELEASE=$SFOS_RELEASE \
             -e VENDOR=$VENDOR \
             -e DEVICE=$DEVICE \
