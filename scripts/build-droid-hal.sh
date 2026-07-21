@@ -1,31 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 
-# Runs inside the Sailfish Platform SDK chroot (sb2 targets), per HADK
-# chapter "Building the packages". Assumes hadk-tools is checked out at
-# $PLATFORM_SDK_ROOT/hadk-tools and droid-config-$DEVICE / droid-hal-version-$DEVICE
-# repos are checked out alongside this project (add them as git submodules
-# or separate CI dependency jobs if they live in their own repos).
+# Runs inside the Platform SDK (sb2 targets), per HADK "Building the
+# packages". hadk-tools, droid-config-$DEVICE, and droid-hal-version-$DEVICE
+# are expected to already exist in the Platform SDK chroot's home dir -
+# that's a one-time manual setup, not something this script creates.
 
-PLATFORM_SDK_ENTER="/srv/hadk/platform-sdk/sdk-chroot"
+mkdir -p "$GITHUB_WORKSPACE/artifacts/rpms"
 
-if [ ! -x "$PLATFORM_SDK_ENTER" ]; then
-  echo "Platform SDK entry script not found/executable at $PLATFORM_SDK_ENTER"
-  exit 1
-fi
-
-mkdir -p "$CI_PROJECT_DIR/rpms"
-
-"$PLATFORM_SDK_ENTER" bash -lc "
+"$PLATFORM_SDK_ROOT/sdk-chroot" -c "
   set -euo pipefail
-  export VENDOR=$VENDOR DEVICE=$DEVICE PORT_ARCH=$PORT_ARCH
-  export ANDROID_ROOT=$ANDROID_ROOT
-
-  # Regenerate droid-hal-version spec, then build the droid-hal-* and
-  # droid-config-* packages for the sb2 target.
+  export ANDROID_ROOT='$ANDROID_ROOT'
+  export VENDOR='$VENDOR'
+  export DEVICE='$DEVICE'
+  export PORT_ARCH='$PORT_ARCH'
   cd ~/hadk-tools
   ./prepare.sh \$DEVICE
   ./build_packages.sh -d
 "
 
-find ~ -name '*.rpm' -newer /tmp -exec cp {} "$CI_PROJECT_DIR/rpms/" \; || true
+# hadk-tools/build_packages.sh drops RPMs under $ANDROID_ROOT/droid-local-repo/
+# by convention; adjust this glob if your hadk-tools version differs.
+find "$ANDROID_ROOT/droid-local-repo/$DEVICE" -name '*.rpm' \
+  -exec cp {} "$GITHUB_WORKSPACE/artifacts/rpms/" \;
