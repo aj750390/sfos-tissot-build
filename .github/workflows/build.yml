@@ -105,7 +105,9 @@ jobs:
           
           cat << 'EOF' > run_build.sh
           #!/bin/bash
-          set -e
+          
+          # Enable verbose logging to see exactly where it fails
+          set -x
           
           export ANDROID_ROOT=$(pwd)
           git config --global --add safe.directory '*'
@@ -113,17 +115,21 @@ jobs:
           echo "=== Setting up Sailfish SDK Target ==="
           TARGET_NAME=${VENDOR}-${DEVICE}-${PORT_ARCH}
           if ! sdk-assistant list | grep -q "$TARGET_NAME"; then
-            sdk-assistant -y create $TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-${SFOS_RELEASE}-Sailfish_SDK_Target-${PORT_ARCH}.tar.7z
+            sdk-assistant -y create $TARGET_NAME https://releases.sailfishos.org/sdk/targets/Sailfish_OS-${SFOS_RELEASE}-Sailfish_SDK_Target-${PORT_ARCH}.tar.7z || exit 1
           fi
           
           echo "=== Compiling Android HAL ==="
+          # Sourcing envsetup safely without set -e
           source build/envsetup.sh
-          breakfast $DEVICE
-          make -j$(nproc) hybris-hal
+          
+          # Explicit lunch target for automated builds
+          lunch lineage_${DEVICE}-userdebug || exit 1
+          
+          make -j$(nproc) hybris-hal || exit 1
           
           echo "=== Packaging Droid HAL ==="
-          ./dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot
-          ./dhd/helpers/build_packages.sh -b rpm/droid-config-tissot
+          ./dhd/helpers/build_packages.sh -b rpm/droid-hal-tissot || exit 1
+          ./dhd/helpers/build_packages.sh -b rpm/droid-config-tissot || exit 1
           EOF
           
           chmod +x run_build.sh
