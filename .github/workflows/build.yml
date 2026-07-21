@@ -47,19 +47,23 @@ jobs:
           fi
           
           # ---------------------------------------------------------
-          # MANUALLY INJECT TISSOT LOCAL MANIFEST
+          # NUKE BROKEN CACHE & INJECT NEW GITLAB MANIFEST
           # ---------------------------------------------------------
+          echo "Clearing out any broken vendor repository caches..."
+          rm -rf vendor/xiaomi .repo/projects/vendor/xiaomi.git .repo/project-objects/TheMuppets/proprietary_vendor_xiaomi.git .repo/project-objects/the-muppets/proprietary_vendor_xiaomi.git
+          
           mkdir -p .repo/local_manifests
           cat << 'EOF' > .repo/local_manifests/tissot.xml
           <?xml version="1.0" encoding="UTF-8"?>
           <manifest>
+            <remote name="gitlab" fetch="https://gitlab.com" />
             <project name="LineageOS/android_device_xiaomi_tissot" path="device/xiaomi/tissot" remote="github" revision="lineage-16.0" />
             <project name="LineageOS/android_kernel_xiaomi_msm8953" path="kernel/xiaomi/msm8953" remote="github" revision="lineage-16.0" />
-            <project name="TheMuppets/proprietary_vendor_xiaomi" path="vendor/xiaomi" remote="github" revision="lineage-16.0" />
+            <project name="the-muppets/proprietary_vendor_xiaomi" path="vendor/xiaomi" remote="gitlab" revision="lineage-16.0" />
           </manifest>
           EOF
           
-          # Force sync. Because we didn't delete the folder, it only downloads the new Tissot repos.
+          # Force sync to grab the repos from the new sources
           repo sync -c -f -j$(nproc) --force-sync
           
           rm -rf external/libhybris
