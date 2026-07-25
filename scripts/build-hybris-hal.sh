@@ -2,19 +2,19 @@
 set -euo pipefail
 
 SDK_CHROOT="$PLATFORM_SDK_ROOT/sdk-chroot"
-HABUILD_CHROOT="/srv/sailfishos/sdks/ubuntu"
+HABUILD_CHROOT_HOST="/srv/sailfishos/sdks/sfossdk/srv/sailfishos/sdks/ubuntu"
+HABUILD_CHROOT_INSIDE="/srv/sailfishos/sdks/ubuntu"
 PARENTROOT_ANDROID="/parentroot$ANDROID_ROOT"
 
 echo "=== Building hybris-boot and hybris-recovery ==="
 
-# Commands to run inside HABUILD chroot
-# Fix sudo permissions first, then start the build
+# Fix broken sudo permissions inside the HABUILD chroot from the host
+echo "Fixing chroot sudo permissions on host..."
+sudo chown root:root "$HABUILD_CHROOT_HOST/etc/sudo.conf" "$HABUILD_CHROOT_HOST/usr/bin/sudo" 2>/dev/null || true
+sudo chmod 4755 "$HABUILD_CHROOT_HOST/usr/bin/sudo" 2>/dev/null || true
+
 CMDS=$(cat <<'CMDEOF'
 set -e
-# Fix broken sudo permissions inside the chroot (we are root here)
-chown root:root /etc/sudo.conf /usr/bin/sudo 2>/dev/null || true
-chmod 4755 /usr/bin/sudo 2>/dev/null || true
-
 cd /parentroot/home/user/hadk
 source build/envsetup.sh
 lunch lineage_tissot-userdebug
@@ -24,7 +24,7 @@ CMDEOF
 )
 
 echo "Launching build inside HABUILD chroot..."
-echo "$CMDS" | sudo "$SDK_CHROOT" ubu-chroot -r "$HABUILD_CHROOT" bash
+echo "$CMDS" | sudo "$SDK_CHROOT" ubu-chroot -r "$HABUILD_CHROOT_INSIDE" bash
 
 if [ $? -ne 0 ]; then
   echo "BUILD FAILED"
