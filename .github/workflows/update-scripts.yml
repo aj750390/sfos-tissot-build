@@ -1,0 +1,151 @@
+name: Update build scripts
+on: workflow_dispatch
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Write build.yml
+        run: |
+          cat > .github/workflows/build.yml << 'EOF'
+name: SFOS tissot build
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+env:
+  ANDROID_ROOT: /home/user/hadk
+  PLATFORM_SDK_ROOT: /srv/sailfishos/sdks/sfossdk
+  DEVICE: tissot
+  SHARED_DIR: /home/user/actions-shared
+jobs:
+  sync_source:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: sfos-tissot-build
+      - name: Ensure directories
+        run: |
+          sudo mkdir -p "$ANDROID_ROOT"
+          sudo mkdir -p "$PLATFORM_SDK_ROOT"
+          mkdir -p "$SHARED_DIR/images" "$SHARED_DIR/out"
+      - name: Setup HABUILD
+        run: bash sfos-tissot-build/scripts/setup-habuild.sh
+      - name: Sync Android source
+        run: bash sfos-tissot-build/scripts/sync-source.sh
+      - name: Show disk usage
+        run: df -h
+
+  build_hybris_hal:
+    runs-on: self-hosted
+    needs: sync_source
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: sfos-tissot-build
+      - name: Use existing images (skip build) or build
+        run: |
+          if [ -f "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img" ]; then
+            echo "Existing images found – copying to shared directory (originals kept intact)"
+            cp -n "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img" "$SHARED_DIR/images/"
+            cp -n "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-recovery.img" "$SHARED_DIR/images/"
+          else
+            echo "No existing images – building from source"
+            bash sfos-tissot-build/scripts/build-hybris-hal.sh
+          fi
+          ls -lh "$SHARED_DIR/images/"
+
+  build_rootfs:
+    runs-on: self-hosted
+    needs: build_hybris_hal
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: sfos-tissot-build
+      - name: Build rootfs (or copy additional images)
+        run: bash sfos-tissot-build/scripts/build-rootfs.sh
+        env:
+          IMAGE_DIR: "$SHARED_DIR/images"
+
+  package_image:
+    runs-on: self-hosted
+    needs: build_rootfs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: sfos-tissot-build
+      - name: Package final image
+        run: bash sfos-tissot-build/scripts/package-image.sh
+        env:
+          IMAGE_DIR: "$SHARED_DIR/images"
+          OUTPUT_DIR: "$SHARED_DIR/out"
+EOF
+
+      - name: Write build-rootfs.sh
+        run: |
+          cat > scripts/build-rootfs.sh << 'EOF'
+#!/bin/bash
+set -euo pipefail
+SDK_CHROOT="$PLATFORM_SDK_ROOT/sdk-chroot"
+HABUILD_CHROOT="/srv/sailfishos/sdks/ubuntu"
+PARENTROOT_ANDROID="/parentroot$ANDROID_ROOT"
+echo "=== Building hybris‑hal system image (if missing) ==="
+IMAGE_DIR="${IMAGE_DIR:-$SHARED_DIR/images}"
+mkdir -p "$IMAGE_DIR"
+if [ -f "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-hal.img" ]; then
+    echo "hybris-hal.img already exists. Skipping build."
+else
+    echo "hybris-hal.img not found. Attempting to build…"
+    CMDS=$(cat <<'CMDEOF'
+set -e
+cd /parentroot/home/user/hadk
+source build/envsetup.sh
+lunch lineage_tissot-userdebug
+make hybris-hal -j$(nproc)
+CMDEOF
+)
+    echo "$CMDS" | sudo "$SDK_CHROOT" ubu-chroot -r "$HABUILD_CHROOT" bash && echo "Build successful." || echo "Build failed (chroot may be broken). Continuing with existing images."
+fi
+for f in hybris-boot.img hybris-recovery.img hybris-hal.img system.img; do
+    if [ -f "$ANDROID_ROOT/out/target/product/$DEVICE/$f" ]; then
+        cp -n "$ANDROID_ROOT/out/target/product/$DEVICE/$f" "$IMAGE_DIR/"
+        echo "Copied $f"
+    fi
+done
+echo "Contents of $IMAGE_DIR:"
+ls -lh "$IMAGE_DIR/"
+EOF
+- name: Write package-image.sh
+        run: |
+          cat > scripts/package-image.sh << 'EOF'
+#!/bin/bash
+set -euo pipefail
+IMAGE_DIR="${IMAGE_DIR:-$SHARED_DIR/images}"
+OUTPUT_DIR="${OUTPUT_DIR:-$SHARED_DIR/out}"
+mkdir -p "$OUTPUT_DIR"
+ZIP_NAME="sfos-tissot-images-$(date +%Y%m%d).zip"
+cd "$IMAGE_DIR" || { echo "Image directory not found: $IMAGE_DIR"; exit 1; }
+if ls *.img 1>/dev/null 2>&1; then
+    zip -r "$OUTPUT_DIR/$ZIP_NAME" *.img
+    echo "Created $OUTPUT_DIR/$ZIP_NAME"
+    ls -lh "$OUTPUT_DIR/$ZIP_NAME"
+else
+    echo "No images found in $IMAGE_DIR to package."
+    exit 1
+fi
+EOF
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "Auto‑update build scripts [skip ci]"
+          git push
