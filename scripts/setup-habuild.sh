@@ -1,28 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 
-if [ ! -d "$ANDROID_ROOT/.repo" ]; then
-  cat <<EOF
-ERROR: Source tree not found at $ANDROID_ROOT/.repo
+UBUNTU_CHROOT_SDK_PATH="/srv/sailfishos/sdks/ubuntu"
 
-The Android source tree must be set up manually ONCE on the runner host.
-To do so, run:
-
-  repo init -u https://github.com/Halium/android -b halium-9.0 --depth=1
-
-inside $ANDROID_ROOT, then re-run this workflow.
-EOF
+if [ ! -x "$PLATFORM_SDK_ROOT/sdk-chroot" ]; then
+  echo "Platform SDK not found at $PLATFORM_SDK_ROOT/sdk-chroot"
+  echo "Install it once, manually, on this runner host:"
+  echo " https://docs.sailfishos.org/Tools/Platform_SDK/Installation/"
   exit 1
 fi
 
-echo "Existing .repo found at $ANDROID_ROOT - syncing incrementally."
-sudo mkdir -p "$ANDROID_ROOT/.repo/local_manifests"
-sudo chown -R "$(whoami)" "$ANDROID_ROOT/.repo/local_manifests" 2>/dev/null || true
+echo "Platform SDK found. Verifying sdk-chroot works..."
+if ! sudo "$PLATFORM_SDK_ROOT/sdk-chroot" -c "echo SDK_OK" 2>/dev/null; then
+  echo "Warning: could not auto-verify sdk-chroot; continuing anyway"
+fi
 
-cp "$GITHUB_WORKSPACE/local_manifests/tissot.xml" "$ANDROID_ROOT/.repo/local_manifests/tissot.xml"
+echo "Checking HABUILD Ubuntu chroot inside SDK..."
+if ! sudo "$PLATFORM_SDK_ROOT/sdk-chroot" -c "test -d $UBUNTU_CHROOT_SDK_PATH" 2>/dev/null; then
+  echo "HABUILD Ubuntu chroot not found inside SDK at $UBUNTU_CHROOT_SDK_PATH"
+  echo "Set it up once: sdk-chroot -c 'ubu-chroot -r $UBUNTU_CHROOT_SDK_PATH init'"
+  exit 1
+fi
 
-cd "$ANDROID_ROOT"
-repo sync -c -j"$(nproc)" --force-sync --no-clone-bundle --optimized-fetch
-
-echo "Sync complete. Current manifest:"
-head -5 .repo/manifest.xml 2>/dev/null || echo "manifest.xml not found"
+echo "HABUILD Ubuntu chroot found and accessible."
