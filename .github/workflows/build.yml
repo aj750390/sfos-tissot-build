@@ -14,7 +14,7 @@ jobs:
   sync_source:
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: sfos-tissot-build
 
@@ -36,7 +36,7 @@ jobs:
     runs-on: self-hosted
     needs: sync_source
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: sfos-tissot-build
 
@@ -59,7 +59,7 @@ jobs:
           fi
 
       - name: Archive images
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: hybris-images
           path: ${{ github.workspace }}/images/
@@ -68,12 +68,12 @@ jobs:
     runs-on: self-hosted
     needs: build_hybris_hal
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: sfos-tissot-build
 
       - name: Download hybris images
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: hybris-images
           path: ${{ github.workspace }}/images/
@@ -87,15 +87,15 @@ jobs:
     runs-on: self-hosted
     needs: build_rootfs
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: sfos-tissot-build
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v3
+      - name: Download hybris images again
+        uses: actions/download-artifact@v4
         with:
-          pattern: "*"
-          path: ${{ github.workspace }}/
+          name: hybris-images
+          path: ${{ github.workspace }}/images/
 
       - name: Package final image
         run: bash sfos-tissot-build/scripts/package-image.sh
