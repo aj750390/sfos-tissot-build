@@ -1,78 +1,104 @@
 name: SFOS tissot build
 
 on:
-  workflow_dispatch: {}
-  schedule:
-    - cron: "0 2 * * 0"
+  workflow_dispatch:
+  push:
+    branches: [ main ]
 
 env:
-  DEVICE: tissot
-  VENDOR: xiaomi
-  PORT_ARCH: armv7hl
-  SFOS_VERSION: "4.6.0.11"
-  PLATFORM_SDK_ROOT: /srv/sailfishos/sdks/sfossdk
   ANDROID_ROOT: /home/user/hadk
+  PLATFORM_SDK_ROOT: /srv/sailfishos/sdks/sfossdk
+  DEVICE: tissot
 
 jobs:
   sync_source:
-    runs-on: [self-hosted, sfos-hadk]
+    runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
-      - name: Ensure source tree and SDK directories exist
+      - uses: actions/checkout@v3
+        with:
+          path: sfos-tissot-build
+
+      - name: Ensure directories
         run: |
-          sudo mkdir -p "$ANDROID_ROOT" "$PLATFORM_SDK_ROOT"
-          sudo chown -R "$USER:$USER" "$ANDROID_ROOT" "$PLATFORM_SDK_ROOT" 2>/dev/null || true
-      - name: Verify Platform SDK / HABUILD chroot present
-        run: bash scripts/setup-habuild.sh
-      - name: Sync source (incremental, preserves existing source)
-        run: bash scripts/sync-source.sh
-      - name: Show manifest reference
-        run: |
-          if [ -f "$ANDROID_ROOT/.repo/manifest.xml" ]; then
-            echo "Current manifest:"
-            head -5 "$ANDROID_ROOT/.repo/manifest.xml"
-          fi
+          sudo mkdir -p "$ANDROID_ROOT"
+          sudo mkdir -p "$PLATFORM_SDK_ROOT"
+
+      - name: Setup HABUILD
+        run: bash sfos-tissot-build/scripts/setup-habuild.sh
+
+      - name: Sync Android source
+        run: bash sfos-tissot-build/scripts/sync-source.sh
+
+      - name: Show disk usage
+        run: df -h
 
   build_hybris_hal:
+    runs-on: self-hosted
     needs: sync_source
-    runs-on: [self-hosted, sfos-hadk]
     steps:
-      - uses: actions/checkout@v4
-      - name: Build hybris-boot / hybris-recovery
-        run: bash scripts/build-hybris-hal.sh
-      - name: Copy images to workspace for artifact upload
-        run: |
-          mkdir -p artifacts
-          cp "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img" artifacts/ || echo "hybris-boot.img not found"
-          cp "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-recovery.img" artifacts/ || echo "hybris-recovery.img not found"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v3
         with:
-          name: hybris-boot-images
-          path: artifacts/*
-          retention-days: 7
+          path: sfos-tissot-build
+
+      - name: Use existing images (skip build) or build
+        run: |
+          mkdir -p ${{ github.workspace }}/images
+          if [ -f "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img" ]; then
+            echo "Existing hybris-boot.img found – copying to workspace (originals kept intact)"
+            cp -n "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img" \
+               "${{ github.workspace }}/images/"
+            cp -n "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-recovery.img" \
+               "${{ github.workspace }}/images/"
+            echo "Verifying originals still exist:"
+            ls -lh "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img"
+            ls -lh "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-recovery.img"
+            ls -lh "${{ github.workspace }}/images/"
+          else
+            echo "No existing images – building from source"
+            bash sfos-tissot-build/scripts/build-hybris-hal.sh
+          fi
+
+      - name: Archive images
+        uses: actions/upload-artifact@v3
+        with:
+          name: hybris-images
+          path: ${{ github.workspace }}/images/
 
   build_rootfs:
+    runs-on: self-hosted
     needs: build_hybris_hal
-    runs-on: [self-hosted, sfos-hadk]
     steps:
-      - uses: actions/checkout@v4
-      - name: Build droid-hal / droid-config RPMs
-        run: bash scripts/build-droid-hal.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v3
         with:
-          name: droid-hal-rpms
-          path: artifacts/rpms/*.rpm
-          retention-days: 7
+          path: sfos-tissot-build
+
+      - name: Download hybris images
+        uses: actions/download-artifact@v3
+        with:
+          name: hybris-images
+          path: ${{ github.workspace }}/images/
+
+      - name: Build rootfs (or copy existing)
+        run: bash sfos-tissot-build/scripts/build-rootfs.sh
+        env:
+          IMAGE_DIR: ${{ github.workspace }}/images/
 
   package_image:
+    runs-on: self-hosted
     needs: build_rootfs
-    runs-on: [self-hosted, sfos-hadk]
     steps:
-      - uses: actions/checkout@v4
-      - name: Build flashable image with mic
-        run: bash scripts/build-image.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v3
         with:
-          name: sfos-tissot-image
-          path: artifacts/images/*
-          retention-days: 14
+          path: sfos-tissot-build
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+        with:
+          pattern: "*"
+          path: ${{ github.workspace }}/
+
+      - name: Package final image
+        run: bash sfos-tissot-build/scripts/package-image.sh
+        env:
+          IMAGE_DIR: ${{ github.workspace }}/images/
+          OUTPUT_DIR: ${{ github.workspace }}/out/
