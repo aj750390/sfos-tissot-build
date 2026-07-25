@@ -5,27 +5,38 @@ on:
   push:
     branches: [ main ]
 
+env:
+  SHARED_DIR: /home/user/actions-shared
+  ANDROID_ROOT: /home/user/hadk
+
 jobs:
   build:
     runs-on: self-hosted
-    container:
-      image: coderus/sailfishos-platform-sdk-base:4.6.0.13
-      volumes:
-        - /home/user/hadk:/home/user/hadk   # mount your existing Android source
-        - /home/user/actions-shared:/shared  # output directory
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           path: sfos-tissot-build
 
-      - name: Set up device config
-        run: source sfos-tissot-build/tissot.env
+      - name: Ensure shared directory exists
+        run: mkdir -p "$SHARED_DIR"
 
-      - name: Run build
-        run: bash sfos-tissot-build/run-mic.sh
+      - name: Run build inside SDK container
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -v $ANDROID_ROOT:/home/user/hadk \
+            -v $SHARED_DIR:/shared \
+            -w /workspace/sfos-tissot-build \
+            coderus/sailfishos-platform-sdk-base:4.6.0.13 \
+            bash -c "
+              source tissot.env
+              bash run-mic.sh
+            "
 
-      - name: Archive flashable zip
+      - name: Upload flashable zip
         uses: actions/upload-artifact@v4
         with:
           name: sfe-tissot
-          path: /shared/sfe-*/*.zip
+          path: /home/user/actions-shared/sfe-*/*.zip
