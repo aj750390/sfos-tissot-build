@@ -7,18 +7,13 @@ PARENTROOT_ANDROID="/parentroot$ANDROID_ROOT"
 
 echo "=== Building hybris-boot and hybris-recovery ==="
 
-# Build commands to run inside HABUILD chroot
-# We create a fake sudo because the chroot's sudo is broken
-BUILD_CMDS=$(cat <<'CMDEOF'
+# Commands to run inside HABUILD chroot
+# Fix sudo permissions first, then start the build
+CMDS=$(cat <<'CMDEOF'
 set -e
-# Fake sudo to avoid ownership errors
-mkdir -p /tmp/fakesudo
-cat > /tmp/fakesudo/sudo << 'SUDOEOF'
-#!/bin/bash
-exec "$@"
-SUDOEOF
-chmod +x /tmp/fakesudo/sudo
-export PATH="/tmp/fakesudo:$PATH"
+# Fix broken sudo permissions inside the chroot (we are root here)
+chown root:root /etc/sudo.conf /usr/bin/sudo 2>/dev/null || true
+chmod 4755 /usr/bin/sudo 2>/dev/null || true
 
 cd /parentroot/home/user/hadk
 source build/envsetup.sh
@@ -29,7 +24,7 @@ CMDEOF
 )
 
 echo "Launching build inside HABUILD chroot..."
-echo "$BUILD_CMDS" | sudo "$SDK_CHROOT" ubu-chroot -r "$HABUILD_CHROOT" bash
+echo "$CMDS" | sudo "$SDK_CHROOT" ubu-chroot -r "$HABUILD_CHROOT" bash
 
 if [ $? -ne 0 ]; then
   echo "BUILD FAILED"
