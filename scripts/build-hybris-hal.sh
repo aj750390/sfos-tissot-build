@@ -2,26 +2,36 @@
 set -euo pipefail
 
 SDK_CHROOT="$PLATFORM_SDK_ROOT/sdk-chroot"
-HABUILD_CHROOT_INSIDE="/srv/sailfishos/sdks/ubuntu"
+HABUILD_CHROOT="/srv/sailfishos/sdks/ubuntu"
+PARENTROOT_ANDROID="/parentroot$ANDROID_ROOT"
 
 echo "=== Building hybris-boot and hybris-recovery ==="
 
-# Switch to the Android source directory inside the SDK + HABUILD chroot
-# We run: sdk-chroot ubu-chroot -r <path> bash -c "…"
-# The ANDROID_ROOT is /home/user/hadk, but inside the HABUILD chroot it's /parentroot/home/user/hadk
-PARENTROOT_ANDROID="/parentroot$ANDROID_ROOT"
-
-COMMANDS="
+# Build commands to run inside HABUILD chroot
+# We create a fake sudo because the chroot's sudo is broken
+BUILD_CMDS=$(cat <<'CMDEOF'
 set -e
-cd $PARENTROOT_ANDROID
+# Fake sudo to avoid ownership errors
+mkdir -p /tmp/fakesudo
+cat > /tmp/fakesudo/sudo << 'SUDOEOF'
+#!/bin/bash
+exec "$@"
+SUDOEOF
+chmod +x /tmp/fakesudo/sudo
+export PATH="/tmp/fakesudo:$PATH"
+
+cd /parentroot/home/user/hadk
 source build/envsetup.sh
 lunch lineage_tissot-userdebug
-make bootimage -j\$(nproc)
-make recoveryimage -j\$(nproc)
-"
+make bootimage -j$(nproc)
+make recoveryimage -j$(nproc)
+CMDEOF
+)
 
 echo "Launching build inside HABUILD chroot..."
-if ! echo "$COMMANDS" | sudo "$SDK_CHROOT" ubu-chroot -r "$HABUILD_CHROOT_INSIDE" bash; then
+echo "$BUILD_CMDS" | sudo "$SDK_CHROOT" ubu-chroot -r "$HABUILD_CHROOT" bash
+
+if [ $? -ne 0 ]; then
   echo "BUILD FAILED"
   exit 1
 fi
