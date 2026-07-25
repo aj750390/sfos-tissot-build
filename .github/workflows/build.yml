@@ -10,8 +10,8 @@ env:
   VENDOR: xiaomi
   PORT_ARCH: armv7hl
   SFOS_VERSION: "4.6.0.11"
-  PLATFORM_SDK_ROOT: /srv/hadk/sdk
-  ANDROID_ROOT: /srv/hadk/hadk
+  PLATFORM_SDK_ROOT: /srv/sailfishos/sdks/sfossdk
+  ANDROID_ROOT: /home/user/hadk
 
 jobs:
   sync_source:
