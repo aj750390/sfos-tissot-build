@@ -1,26 +1,31 @@
 #!/bin/bash
 set -euo pipefail
 
-UBUNTU_CHROOT="$PLATFORM_SDK_ROOT/sdks/ubuntu"
+SDK_CHROOT="$PLATFORM_SDK_ROOT/sdk-chroot"
+HABUILD_CHROOT_INSIDE="/srv/sailfishos/sdks/ubuntu"
 
-# ubu-chroot must be invoked from inside the Platform SDK shell (sdk-chroot),
-# and ANDROID_ROOT/DEVICE/VENDOR/PORT_ARCH need to be visible inside that
-# nested chroot too, hence re-exporting them in the -c string below.
-"$PLATFORM_SDK_ROOT/sdk-chroot" -c "
-  ubu-chroot -r '$UBUNTU_CHROOT' bash -lc '
-    set -euo pipefail
-    export ANDROID_ROOT=\"$ANDROID_ROOT\"
-    export DEVICE=\"$DEVICE\"
-    export VENDOR=\"$VENDOR\"
-    export PORT_ARCH=\"$PORT_ARCH\"
-    cd \"\$ANDROID_ROOT\"
-    source build/envsetup.sh
-    breakfast \$DEVICE
-    make -j\$(nproc) hybris-hal
-  '
+echo "=== Building hybris-boot and hybris-recovery ==="
+
+# Switch to the Android source directory inside the SDK + HABUILD chroot
+# We run: sdk-chroot ubu-chroot -r <path> bash -c "…"
+# The ANDROID_ROOT is /home/user/hadk, but inside the HABUILD chroot it's /parentroot/home/user/hadk
+PARENTROOT_ANDROID="/parentroot$ANDROID_ROOT"
+
+COMMANDS="
+set -e
+cd $PARENTROOT_ANDROID
+source build/envsetup.sh
+lunch lineage_tissot-userdebug
+make bootimage -j\$(nproc)
+make recoveryimage -j\$(nproc)
 "
 
-OUT_DIR="$ANDROID_ROOT/out/target/product/$DEVICE"
-test -f "$OUT_DIR/hybris-boot.img"
-test -f "$OUT_DIR/hybris-recovery.img"
-echo "hybris-boot.img and hybris-recovery.img built OK at $OUT_DIR"
+echo "Launching build inside HABUILD chroot..."
+if ! echo "$COMMANDS" | sudo "$SDK_CHROOT" ubu-chroot -r "$HABUILD_CHROOT_INSIDE" bash; then
+  echo "BUILD FAILED"
+  exit 1
+fi
+
+echo "Build succeeded. Checking output files..."
+ls -lh "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img" 2>/dev/null || echo "hybris-boot.img not found"
+ls -lh "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-recovery.img" 2>/dev/null || echo "hybris-recovery.img not found"
