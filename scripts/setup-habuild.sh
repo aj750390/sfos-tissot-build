@@ -1,31 +1,28 @@
 #!/bin/bash
 set -euo pipefail
 
-# Platform SDK + the HABUILD Ubuntu chroot are installed ONCE, by hand, on
-# the runner host, per:
-#   Platform SDK: https://docs.sailfishos.org/Tools/Platform_SDK/Installation/
-#   HABUILD chroot: https://hadk.sailfishos.org/setupsdk/
-#
-# This script only verifies they're already present at $PLATFORM_SDK_ROOT
-# and fails fast with instructions if not - it does not attempt to
-# install multi-GB SDKs inside a CI job.
+if [ ! -d "$ANDROID_ROOT/.repo" ]; then
+  cat <<EOF
+ERROR: Source tree not found at $ANDROID_ROOT/.repo
 
-UBUNTU_CHROOT="$PLATFORM_SDK_ROOT/sdks/ubuntu"
+The Android source tree must be set up manually ONCE on the runner host.
+To do so, run:
 
-if [ ! -x "$PLATFORM_SDK_ROOT/sdk-chroot" ]; then
-  echo "Platform SDK not found at $PLATFORM_SDK_ROOT."
-  echo "Install it once, manually, on this runner host:"
-  echo "  https://docs.sailfishos.org/Tools/Platform_SDK/Installation/"
+  repo init -u https://github.com/Halium/android -b halium-9.0 --depth=1
+
+inside $ANDROID_ROOT, then re-run this workflow.
+EOF
   exit 1
 fi
 
-if [ ! -d "$UBUNTU_CHROOT" ]; then
-  echo "HABUILD Ubuntu chroot not found at $UBUNTU_CHROOT."
-  echo "Set it up once, manually, following:"
-  echo "  https://hadk.sailfishos.org/setupsdk/"
-  exit 1
-fi
+echo "Existing .repo found at $ANDROID_ROOT - syncing incrementally."
+sudo mkdir -p "$ANDROID_ROOT/.repo/local_manifests"
+sudo chown -R "$(whoami)" "$ANDROID_ROOT/.repo/local_manifests" 2>/dev/null || true
 
-echo "Platform SDK and HABUILD chroot found. Verifying ubu-chroot works..."
-"$PLATFORM_SDK_ROOT/sdk-chroot" -c "ubu-chroot -r $UBUNTU_CHROOT echo HABUILD_SDK_OK" 2>/dev/null \
-  || echo "Warning: could not auto-verify ubu-chroot; continuing anyway - build-hybris-hal.sh will fail loudly if it's actually broken."
+cp "$GITHUB_WORKSPACE/local_manifests/tissot.xml" "$ANDROID_ROOT/.repo/local_manifests/tissot.xml"
+
+cd "$ANDROID_ROOT"
+repo sync -c -j"$(nproc)" --force-sync --no-clone-bundle --optimized-fetch
+
+echo "Sync complete. Current manifest:"
+head -5 .repo/manifest.xml 2>/dev/null || echo "manifest.xml not found"
