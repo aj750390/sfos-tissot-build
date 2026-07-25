@@ -15,7 +15,7 @@ EOF
   exit 1
 fi
 
-echo "Existing .repo found at $ANDROID_ROOT - syncing incrementally."
+echo "Existing .repo found at $ANDROID_ROOT - attempting incremental sync..."
 
 # Copy local manifest if present (optional)
 if [ -f "$GITHUB_WORKSPACE/local_manifests/tissot.xml" ]; then
@@ -28,7 +28,17 @@ else
 fi
 
 cd "$ANDROID_ROOT"
-repo sync -c -j"$(nproc)" --force-sync --no-clone-bundle --optimized-fetch
 
-echo "Sync complete. Current manifest:"
+# Disable git terminal prompts so repo sync won't hang
+export GIT_TERMINAL_PROMPT=0
+
+# Try to sync, but do not fail the job if it fails
+if repo sync -c -j"$(nproc)" --force-sync --no-clone-bundle --optimized-fetch; then
+  echo "Sync succeeded."
+else
+  echo "WARNING: repo sync had errors (likely network/auth), but continuing with existing source."
+  echo "If you need a full fresh source, run repo sync manually outside of CI."
+fi
+
+echo "Current manifest reference:"
 head -5 .repo/manifest.xml 2>/dev/null || echo "manifest.xml not found"
