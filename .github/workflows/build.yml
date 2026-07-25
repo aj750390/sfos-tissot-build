@@ -1,104 +1,31 @@
-name: SFOS tissot build
+name: Build SailfishOS for tissot
 
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
 
-env:
-  ANDROID_ROOT: /home/user/hadk
-  PLATFORM_SDK_ROOT: /srv/sailfishos/sdks/sfossdk
-  DEVICE: tissot
-
 jobs:
-  sync_source:
+  build:
     runs-on: self-hosted
+    container:
+      image: coderus/sailfishos-platform-sdk-base:4.6.0.13
+      volumes:
+        - /home/user/hadk:/home/user/hadk   # mount your existing Android source
+        - /home/user/actions-shared:/shared  # output directory
     steps:
       - uses: actions/checkout@v4
         with:
           path: sfos-tissot-build
 
-      - name: Ensure directories
-        run: |
-          sudo mkdir -p "$ANDROID_ROOT"
-          sudo mkdir -p "$PLATFORM_SDK_ROOT"
+      - name: Set up device config
+        run: source sfos-tissot-build/tissot.env
 
-      - name: Setup HABUILD
-        run: bash sfos-tissot-build/scripts/setup-habuild.sh
+      - name: Run build
+        run: bash sfos-tissot-build/run-mic.sh
 
-      - name: Sync Android source
-        run: bash sfos-tissot-build/scripts/sync-source.sh
-
-      - name: Show disk usage
-        run: df -h
-
-  build_hybris_hal:
-    runs-on: self-hosted
-    needs: sync_source
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: sfos-tissot-build
-
-      - name: Use existing images (skip build) or build
-        run: |
-          mkdir -p ${{ github.workspace }}/images
-          if [ -f "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img" ]; then
-            echo "Existing hybris-boot.img found – copying to workspace (originals kept intact)"
-            cp -n "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img" \
-               "${{ github.workspace }}/images/"
-            cp -n "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-recovery.img" \
-               "${{ github.workspace }}/images/"
-            echo "Verifying originals still exist:"
-            ls -lh "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-boot.img"
-            ls -lh "$ANDROID_ROOT/out/target/product/$DEVICE/hybris-recovery.img"
-            ls -lh "${{ github.workspace }}/images/"
-          else
-            echo "No existing images – building from source"
-            bash sfos-tissot-build/scripts/build-hybris-hal.sh
-          fi
-
-      - name: Archive images
+      - name: Archive flashable zip
         uses: actions/upload-artifact@v4
         with:
-          name: hybris-images
-          path: ${{ github.workspace }}/images/
-
-  build_rootfs:
-    runs-on: self-hosted
-    needs: build_hybris_hal
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: sfos-tissot-build
-
-      - name: Download hybris images
-        uses: actions/download-artifact@v4
-        with:
-          name: hybris-images
-          path: ${{ github.workspace }}/images/
-
-      - name: Build rootfs (or copy existing)
-        run: bash sfos-tissot-build/scripts/build-rootfs.sh
-        env:
-          IMAGE_DIR: ${{ github.workspace }}/images/
-
-  package_image:
-    runs-on: self-hosted
-    needs: build_rootfs
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: sfos-tissot-build
-
-      - name: Download hybris images again
-        uses: actions/download-artifact@v4
-        with:
-          name: hybris-images
-          path: ${{ github.workspace }}/images/
-
-      - name: Package final image
-        run: bash sfos-tissot-build/scripts/package-image.sh
-        env:
-          IMAGE_DIR: ${{ github.workspace }}/images/
-          OUTPUT_DIR: ${{ github.workspace }}/out/
+          name: sfe-tissot
+          path: /shared/sfe-*/*.zip
