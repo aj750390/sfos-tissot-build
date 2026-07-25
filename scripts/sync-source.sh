@@ -1,10 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# ANDROID_ROOT is a fixed, persistent path on the runner host.
-# The source tree is assumed to already exist (set up manually once).
-# This script only performs incremental syncs; it does NOT re-init.
-
 if [ ! -d "$ANDROID_ROOT/.repo" ]; then
   cat <<EOF
 ERROR: Source tree not found at $ANDROID_ROOT/.repo
