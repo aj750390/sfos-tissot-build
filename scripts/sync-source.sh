@@ -16,10 +16,16 @@ EOF
 fi
 
 echo "Existing .repo found at $ANDROID_ROOT - syncing incrementally."
-sudo mkdir -p "$ANDROID_ROOT/.repo/local_manifests"
-sudo chown -R "$(whoami)" "$ANDROID_ROOT/.repo/local_manifests" 2>/dev/null || true
 
-cp "$GITHUB_WORKSPACE/local_manifests/tissot.xml" "$ANDROID_ROOT/.repo/local_manifests/tissot.xml"
+# Copy local manifest if present (optional)
+if [ -f "$GITHUB_WORKSPACE/local_manifests/tissot.xml" ]; then
+  sudo mkdir -p "$ANDROID_ROOT/.repo/local_manifests"
+  sudo chown -R "$(whoami)" "$ANDROID_ROOT/.repo/local_manifests" 2>/dev/null || true
+  cp "$GITHUB_WORKSPACE/local_manifests/tissot.xml" "$ANDROID_ROOT/.repo/local_manifests/tissot.xml"
+  echo "Copied local manifest."
+else
+  echo "No local_manifests/tissot.xml found in workspace – skipping."
+fi
 
 cd "$ANDROID_ROOT"
 repo sync -c -j"$(nproc)" --force-sync --no-clone-bundle --optimized-fetch
